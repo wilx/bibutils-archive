@@ -1,6 +1,27 @@
 
 BIBUTILS
 
+5.7
+2/15/16
+
+MODSIN
++ Handle relatedItem original information (reported by John Vandenberg)
+
+BIBTEXOUT
++ Resolve INBOOK/MISC problems (reported by John Vandenberg)
++ Improve output of latex macros (reported by John Vandenberg)
+
+RISIN
++ Recognize URL's buried in the notes field
++ Properly propagate situation when journal name in RIS is under "T2"--short
+title, not "JF"--journal title (reported by Mary Martin)
+
+GLOBAL
++ Update library components to current versions
++ Improve error propagation
++ Lots of small fixes found by clang --analyze
+
+
 5.6
 1/26/15
 

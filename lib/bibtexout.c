@@ -1,7 +1,7 @@
 /*
  * bibtexout.c
  *
- * Copyright (c) Chris Putnam 2003-2015
+ * Copyright (c) Chris Putnam 2003-2016
  *
  * Program and source code released under the GPL version 2
  *
@@ -115,9 +115,11 @@ bibtexout_type( fields *info, char *filename, int refnum, param *p )
 			else type = TYPE_INCOLLECTION;
 		} else if ( !strcasecmp( genre, "report" ) )
 			type = TYPE_REPORT;
+		else if ( !strcasecmp( genre, "book chapter" ) )
+			type = TYPE_INBOOK;
 		else if ( !strcasecmp( genre, "book" ) ) {
-			if ( level==0 ) type=TYPE_BOOK;
-			else type=TYPE_INBOOK;
+			if ( level==0 ) type = TYPE_BOOK;
+			else type = TYPE_INBOOK;
 		} else if ( !strcasecmp( genre, "thesis" ) ) {
 			if ( type==TYPE_UNKNOWN ) type=TYPE_PHDTHESIS;
 		} else if ( !strcasecmp( genre, "Ph.D. thesis" ) )
@@ -132,7 +134,7 @@ bibtexout_type( fields *info, char *filename, int refnum, param *p )
 			if ( strcasecmp( info->tag[i].data, "ISSUANCE" ) ) continue;
 			if ( !strcasecmp( info->data[i].data, "monographic" ) ) {
 				if ( info->level[i]==0 ) type = TYPE_BOOK;
-				else if ( info->level[i]==1 ) type=TYPE_INBOOK;
+				else if ( info->level[i]==1 ) type=TYPE_MISC;
 			}
 		}
 	}
@@ -140,7 +142,7 @@ bibtexout_type( fields *info, char *filename, int refnum, param *p )
 	/* default to BOOK type */
 	if ( type==TYPE_UNKNOWN ) {
 		maxlevel = fields_maxlevel( info );
-		if ( maxlevel > 0 ) type = TYPE_INBOOK;
+		if ( maxlevel > 0 ) type = TYPE_MISC;
 		else {
 			if ( p->progname ) fprintf( stderr, "%s: ", p->progname );
 			fprintf( stderr, "Cannot identify TYPE "
@@ -354,36 +356,54 @@ output_people( FILE *fp, fields *info, unsigned long refnum, char *tag,
 }
 
 static void
-output_title( FILE *fp, fields *info, unsigned long refnum, char *bibtag, int level, int format_opts )
+output_title_chosen( FILE *fp, fields *info, char *bibtag, int format_opts, int n1, int n2 )
 {
 	newstr title, *mainttl, *subttl;
-	int n1 = -1, n2 = -1;
-	/* Option is for short titles of journals */
-	if ( ( format_opts & BIBOUT_SHORTTITLE ) && level==1 ) {
-		n1 = fields_find( info, "SHORTTITLE", level );
-		n2 = fields_find( info, "SHORTSUBTITLE", level );
+
+	if ( n1==-1 ) return;
+
+	newstr_init( &title );
+
+	mainttl = fields_value( info, n1, FIELDS_STRP );
+	newstr_newstrcpy( &title, mainttl );
+	fields_setused( info, n1 );
+	if ( n2!=-1 ) {
+		subttl = fields_value( info, n2, FIELDS_STRP );
+		if ( mainttl->len > 0 &&
+		     mainttl->data[mainttl->len-1]!='?' )
+			newstr_strcat( &title, ": " );
+		else newstr_addchar( &title, ' ' );
+		newstr_newstrcat( &title, subttl );
+		fields_setused( info, n2 );
 	}
-	if ( n1==-1 ) {
-		n1 = fields_find( info, "TITLE", level );
-		n2 = fields_find( info, "SUBTITLE", level );
+	output_element( fp, bibtag, title.data, format_opts );
+
+	newstr_free( &title );
+}
+
+static void
+output_title( FILE *fp, fields *info, unsigned long refnum, char *bibtag, int level, int format_opts )
+{
+	int title = -1, short_title = -1;
+	int subtitle = -1, short_subtitle = -1;
+	int use_title = -1, use_subtitle = -1;
+
+	title          = fields_find( info, "TITLE",         level );
+	short_title    = fields_find( info, "SHORTTITLE",    level );
+	subtitle       = fields_find( info, "SUBTITLE",      level );
+	short_subtitle = fields_find( info, "SHORTSUBTITLE", level );
+
+	if ( title==-1 || ( ( format_opts & BIBOUT_SHORTTITLE ) && level==1 ) ) {
+		use_title    = short_title;
+		use_subtitle = short_subtitle;
 	}
-	if ( n1!=-1 ) {
-		newstr_init( &title );
-		mainttl = fields_value( info, n1, FIELDS_STRP );
-		newstr_newstrcpy( &title, mainttl );
-		fields_setused( info, n1 );
-		if ( n2!=-1 ) {
-			subttl = fields_value( info, n2, FIELDS_STRP );
-			if ( mainttl->len > 0 &&
-			     mainttl->data[mainttl->len-1]!='?' )
-				newstr_strcat( &title, ": " );
-			else newstr_addchar( &title, ' ' );
-			newstr_newstrcat( &title, subttl );
-			fields_setused( info, n2 );
-		}
-		output_element( fp, bibtag, title.data, format_opts );
-		newstr_free( &title );
+
+	else {
+		use_title    = title;
+		use_subtitle = subtitle;
 	}
+
+	output_title_chosen( fp, info, bibtag, format_opts, use_title, use_subtitle );
 }
 
 static void

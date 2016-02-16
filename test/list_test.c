@@ -1,6 +1,11 @@
 /*
  * list_test.c
  *
+ * Copyright (c) 2013-2016
+ *
+ * Source code released under the GPL version 2
+ *
+ *
  * test list functions
  */
 #include <stdio.h>

@@ -1,7 +1,7 @@
 /*
  * modsin.c
  *
- * Copyright (c) Chris Putnam 2004-2015
+ * Copyright (c) Chris Putnam 2004-2016
  *
  * Source code released under the GPL version 2
  *
@@ -211,7 +211,7 @@ modsin_page( xml *node, fields *info, int level )
 	}
 out:
 	newstrs_free( &sp, &ep, &tp, &lp, NULL );
-	return BIBL_OK;
+	return status;
 }
 
 static int
@@ -248,7 +248,7 @@ modsin_title( xml *node, fields *info, int level )
 	};
 	int fstatus, status = BIBL_OK;
 	newstr title, subtitle;
-	xml *dnode = node->down;
+	xml *dnode;
 	int abbr;
 
 	dnode = node->down;
@@ -791,7 +791,7 @@ modsin_description( xml *node, fields *info, int level )
 	}
 out:
 	newstr_free( &s );
-	return BIBL_OK;
+	return status;
 }
 
 static int
@@ -944,6 +944,10 @@ modsin_mods( xml *node, fields *info, int level )
 			  xml_tag_attrib( node, "relatedItem", "type", "series" ) ) {
 			if ( node->down ) status = modsin_mods( node->down, info, level+1 );
 		}
+		else if ( xml_tag_attrib( node, "relatedItem", "type", "original" ) ) {
+			if ( node->down ) status = modsin_mods( node->down, info, LEVEL_ORIG );
+		}
+
 		if ( status!=BIBL_OK ) return status;
 	}
 

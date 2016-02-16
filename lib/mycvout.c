@@ -1,7 +1,7 @@
 /*
  * bibtexout.c
  *
- * Copyright (c) Chris Putnam 2003-2015
+ * Copyright (c) Chris Putnam 2003-2016
  *
  * Source code released under the GPL version 2
  *
@@ -91,7 +91,7 @@ bibtexout_type( fields *info, char *filename, int refnum, param *p )
 	int type = TYPE_UNKNOWN, i, maxlevel, n, level;
 
 	/* determine bibliography type */
-	for ( i=0; i<info->nfields; ++i ) {
+	for ( i=0; i<info->n; ++i ) {
 		if ( strcasecmp( info->tag[i].data, "GENRE" ) &&
 		     strcasecmp( info->tag[i].data, "NGENRE" ) ) continue;
 		genre = info->data[i].data;
@@ -127,7 +127,7 @@ bibtexout_type( fields *info, char *filename, int refnum, param *p )
 			type = TYPE_ELECTRONIC;
 	}
 	if ( type==TYPE_UNKNOWN ) {
-		for ( i=0; i<info->nfields; ++i ) {
+		for ( i=0; i<info->n; ++i ) {
 			if ( strcasecmp( info->tag[i].data, "ISSUANCE" ) ) continue;
 			if ( !strcasecmp( info->data[i].data, "monographic" ) ) {
 				if ( info->level[i]==0 ) type = TYPE_BOOK;
@@ -258,7 +258,7 @@ output_simpleall( FILE *fp, fields *info, char *intag, char *outtag,
 		int format_opts )
 {
 	int i;
-	for ( i=0; i<info->nfields; ++i ) {
+	for ( i=0; i<info->n; ++i ) {
 		if ( strcasecmp( info->tag[i].data, intag ) ) continue;
 		output_and_use( fp, info, i, outtag, format_opts );
 	}
@@ -270,7 +270,7 @@ output_fileattach( FILE *fp, fields *info, int format_opts )
 	newstr data;
 	int i;
 	newstr_init( &data );
-	for ( i=0; i<info->nfields; ++i ) {
+	for ( i=0; i<info->n; ++i ) {
 		if ( strcasecmp( info->tag[i].data, "FILEATTACH" ) ) continue;
 		newstr_strcpy( &data, ":" );
 		newstr_newstrcat( &data, &(info->data[i]) );
@@ -314,7 +314,7 @@ output_people( FILE *fp, fields *info, unsigned long refnum, char *tag,
 
 	/* primary citation authors */
 	npeople = 0;
-	for ( i=0; i<info->nfields; ++i ) {
+	for ( i=0; i<info->n; ++i ) {
 		if ( level!=-1 && info->level[i]!=level ) continue;
 		person = ( strcasecmp( info->tag[i].data, tag ) == 0 );
 		corp   = ( strcasecmp( info->tag[i].data, ctag ) == 0 );

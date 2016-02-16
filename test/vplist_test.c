@@ -1,6 +1,11 @@
 /*
  * vplist_test.c
  *
+ * Copyright (c) 2014-2016
+ *
+ * Source code released under the GPL version 2
+ *
+ *
  * test vplist functions
  */
 #include <stdio.h>

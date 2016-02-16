@@ -1,6 +1,10 @@
 /*
  * newstr_test.c
  *
+ * Copyright (c) 2012-2016
+ *
+ * Source code released under the GPL version 2
+ *
  * test newstr functions
  */
 
