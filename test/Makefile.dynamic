@@ -6,7 +6,8 @@ CFLAGS   = -I ../lib $(CFLAGSIN)
 LDFLAGS  = -L ../lib
 LDLIBS   = -lbibutils
 
-PROGS    = entities_test \
+PROGS    = doi_test \
+           entities_test \
            list_test \
            newstr_test \
            utf8_test
@@ -17,6 +18,9 @@ entities_test : entities_test.o
 	$(CC) $(LDFLAGS) $^ $(LOADLIBES) $(LDLIBS) -o $@
 
 utf8_test : utf8_test.o
+	$(CC) $(LDFLAGS) $^ $(LOADLIBES) $(LDLIBS) -o $@
+
+doi_test : doi_test.o
 	$(CC) $(LDFLAGS) $^ $(LOADLIBES) $(LDLIBS) -o $@
 
 newstr_test : newstr_test.o
@@ -31,7 +35,8 @@ test: $(PROGS) FORCE
 	./newstr_test; \
 	./list_test; \
 	./entities_test; \
-	./utf8_test )
+	./utf8_test;
+	./doi_test )
 
 clean:
 	rm -f *.o core 

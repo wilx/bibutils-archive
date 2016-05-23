@@ -14,7 +14,11 @@
 #include "fields.h"
 #include "xml.h"
 #include "xml_encoding.h"
-#include "wordin.h"
+#include "bibformats.h"
+
+static int wordin_readf( FILE *fp, char *buf, int bufsize, int *bufpos, newstr *line, newstr *reference, int *fcharset );
+static int wordin_processf( fields *wordin, char *data, char *filename, long nref, param *p );
+
 
 /*****************************************************
  PUBLIC: void wordin_initparams()
@@ -68,7 +72,7 @@ wordin_findendwrapper( char *buf, int ntype )
 	return endptr;
 }
 
-int
+static int
 wordin_readf( FILE *fp, char *buf, int bufsize, int *bufpos, newstr *line, newstr *reference, int *fcharset )
 {
 	newstr tmp;
@@ -223,7 +227,7 @@ wordin_pages( xml *node, fields *info )
 	}
 
 	if ( sp.len ) {
-		status = fields_add( info, "PAGESTART", sp.data, 1 );
+		status = fields_add( info, "PAGES:START", sp.data, 1 );
 		if ( status!=FIELDS_OK ) {
 			ret = BIBL_ERR_MEMERR;
 			goto out;
@@ -234,9 +238,9 @@ wordin_pages( xml *node, fields *info )
 		if ( sp.len > ep.len ) {
 			for ( i=sp.len-ep.len; i<sp.len; ++i )
 				sp.data[i] = ep.data[i-sp.len+ep.len];
-			status = fields_add( info, "PAGEEND", sp.data, 1 );
+			status = fields_add( info, "PAGES:STOP", sp.data, 1 );
 		} else
-			status = fields_add( info, "PAGEEND", ep.data, 1 );
+			status = fields_add( info, "PAGES:STOP", ep.data, 1 );
 		if ( status!=FIELDS_OK ) {
 			ret = BIBL_ERR_MEMERR;
 			goto out;
@@ -299,8 +303,8 @@ wordin_assembleref( xml *node, fields *info )
 	return ret;
 }
 
-int
-wordin_processf( fields *wordin, char *data, char *filename, long nref )
+static int
+wordin_processf( fields *wordin, char *data, char *filename, long nref, param *p )
 {
 	int status, ret = 1;
 	xml top;

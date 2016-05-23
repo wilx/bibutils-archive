@@ -72,6 +72,11 @@ pmid_to_url( fields *f, int n, char *urltag, newstr *url )
 	xxx_to_url( f, n, "http://www.ncbi.nlm.nih.gov/pubmed", urltag, url );
 }
 void
+pmc_to_url( fields *f, int n, char *urltag, newstr *url )
+{
+	xxx_to_url( f, n, "http://www.ncbi.nlm.nih.gov/pmc/articles", urltag, url );
+}
+void
 arxiv_to_url( fields *f, int n, char *urltag, newstr *url )
 {
 	xxx_to_url( f, n, "http://arxiv.org/abs", urltag, url );
@@ -112,4 +117,43 @@ is_doi( char *s )
 	if ( string_pattern( s, "doi: ##.####/", 0 ) ) return 5;
 	if ( string_pattern( s, "doi: DOI: ##.####/", 0 ) ) return 10;
 	return -1;
+}
+
+/* determine if string has the header of a Universal Resource Identifier
+ *
+ * returns -1, if not true
+ * returns offset that skips over the URI scheme, if true
+ */
+int
+is_uri_remote_scheme( char *p )
+{
+	char *scheme[]   = { "http:", "https:", "ftp:", "git:", "gopher:" };
+	int  schemelen[] = { 5,       6,         4,       4,     7 };
+        int i, nschemes = sizeof( scheme ) / sizeof( scheme[0] );
+        for ( i=0; i<nschemes; ++i ) {
+                if ( !strncasecmp( p, scheme[i], schemelen[i] ) ) return schemelen[i];
+        }
+        return -1;
+}
+
+int
+is_reference_database( char *p )
+{
+	char *scheme[]   = { "arXiv:", "pubmed:", "medline:", "isi:" };
+	int  schemelen[] = { 6,        7,         8,          4 };
+        int i, nschemes = sizeof( scheme ) / sizeof( scheme[0] );
+        for ( i=0; i<nschemes; ++i ) {
+                if ( !strncasecmp( p, scheme[i], schemelen[i] ) ) return schemelen[i];
+        }
+        return -1;
+}
+
+/* many fields have been abused to embed URLs, DOIs, etc. */
+int
+is_embedded_link( char *s )
+{
+	if ( is_uri_remote_scheme( s ) != -1 ) return 1;
+	if ( is_reference_database( s ) != -1 ) return 1;
+	if ( is_doi( s ) !=-1 ) return 1;
+	return 0;
 }

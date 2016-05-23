@@ -27,6 +27,8 @@ BIBL_OBJS     = bibl.o \
                 iso639_3.o \
                 marc.o \
                 name.o \
+                notes.o \
+                pages.o \
                 reftypes.o \
                 serialno.o \
                 title.o

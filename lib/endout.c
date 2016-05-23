@@ -16,7 +16,11 @@
 #include "fields.h"
 #include "doi.h"
 #include "name.h"
-#include "endout.h"
+#include "bibformats.h"
+
+static void endout_write( fields *info, FILE *fp, param *p, unsigned long refnum );
+static void endout_writeheader( FILE *outptr, param *p );
+
 
 void
 endout_initparams( param *p, const char *progname )
@@ -470,8 +474,8 @@ output_people( FILE *fp, fields *info, char *tag, char *entag, int level )
 static void
 output_pages( FILE *fp, fields *info )
 {
-	char *sn = fields_findv( info, LEVEL_ANY, FIELDS_CHRP, "PAGESTART" );
-	char *en = fields_findv( info, LEVEL_ANY, FIELDS_CHRP, "PAGEEND" );
+	char *sn = fields_findv( info, LEVEL_ANY, FIELDS_CHRP, "PAGES:START" );
+	char *en = fields_findv( info, LEVEL_ANY, FIELDS_CHRP, "PAGES:STOP" );
 	char *ar;
 	if ( sn || en ) {
 		fprintf( fp, "%%P ");
@@ -502,6 +506,25 @@ output_doi( FILE *fp, fields *f )
 	}
 
 	newstr_free( &doi_url );
+}
+
+static void
+output_pmc( FILE *fp, fields *f )
+{
+	newstr pmc_url;
+	int i, n;
+
+	newstr_init( &pmc_url );
+
+	n = fields_num( f );
+	for ( i=0; i<n; ++i ) {
+		if ( !fields_match_tag( f, i, "PMC" ) ) continue;
+		pmc_to_url( f, i, "URL", &pmc_url );
+		if ( pmc_url.len )
+			fprintf( fp, "%%U %s\n", pmc_url.data );
+	}
+
+	newstr_free( &pmc_url );
 }
 
 static void
@@ -565,7 +588,7 @@ static void
 output_year( FILE *fp, fields *info, int level )
 {
 	char *year = fields_findv_firstof( info, level, FIELDS_CHRP,
-			"YEAR", "PARTYEAR", NULL );
+			"DATE:YEAR", "PARTDATE:YEAR", NULL );
 	if ( year )
 		fprintf( fp, "%%D %s\n", year );
 }
@@ -578,9 +601,9 @@ output_monthday( FILE *fp, fields *info, int level )
 		"November", "December" };
 	int m;
 	char *month = fields_findv_firstof( info, level, FIELDS_CHRP,
-			"MONTH", "PARTMONTH", NULL );
+			"DATE:MONTH", "PARTDATE:MONTH", NULL );
 	char *day   = fields_findv_firstof( info, level, FIELDS_CHRP,
-			"DAY", "PARTDAY", NULL );
+			"DATE:DAY", "PARTDATE:DAY", NULL );
 	if ( month || day ) {
 		fprintf( fp, "%%8 " );
 		if ( month ) {
@@ -628,7 +651,7 @@ output_easy( FILE *fp, fields *info, char *tag, char *entag, int level )
 	if ( value ) fprintf( fp, "%s %s\n", entag, value );
 }
 
-void
+static void
 endout_write( fields *info, FILE *fp, param *p, unsigned long refnum )
 {
 	int type, status;
@@ -721,6 +744,7 @@ endout_write( fields *info, FILE *fp, param *p, unsigned long refnum )
 	output_easyall( fp, info, "FILEATTACH",      "%U", LEVEL_ANY ); 
 	output_doi( fp, info );
 	output_pmid( fp, info );
+	output_pmc( fp, info );
 	output_arxiv( fp, info );
 	output_jstor( fp, info );
 	output_pages( fp, info );
@@ -728,7 +752,7 @@ endout_write( fields *info, FILE *fp, param *p, unsigned long refnum )
 	fflush( fp );
 }
 
-void
+static void
 endout_writeheader( FILE *outptr, param *p )
 {
 	if ( p->utf8bom ) utf8_writebom( outptr );

@@ -14,14 +14,17 @@
 #include "is_ws.h"
 #include "strsearch.h"
 #include "newstr.h"
+#include "utf8.h"
 #include "newstr_conv.h"
 #include "fields.h"
 #include "list.h"
 #include "name.h"
 #include "reftypes.h"
-#include "biblatexin.h"
+#include "bibformats.h"
+#include "generic.h"
 
-extern const char progname[];
+extern variants biblatex_all[];
+extern int biblatex_nall;
 
 static list find    = { 0, 0, NULL, 0 };
 static list replace = { 0, 0, NULL, 0 };
@@ -29,6 +32,12 @@ static list replace = { 0, 0, NULL, 0 };
 /*****************************************************
  PUBLIC: void biblatexin_initparams()
 *****************************************************/
+
+static int  biblatexin_convertf( fields *bibin, fields *info, int reftype, param *p );
+static int  biblatexin_processf( fields *bibin, char *data, char *filename, long nref, param *p );
+static int  biblatexin_cleanf( bibl *bin, param *p );
+static int  biblatexin_readf( FILE *fp, char *buf, int bufsize, int *bufpos, newstr *line, newstr *reference, int *fcharset );
+static int  biblatexin_typef( fields *bibin, char *filename, int nrefs, param *p );
 
 void
 biblatexin_initparams( param *p, const char *progname )
@@ -84,7 +93,7 @@ readmore( FILE *fp, char *buf, int bufsize, int *bufpos, newstr *line )
  * returns zero if cannot get reference and hit end of-file
  * returns 1 if last reference in file, 2 if reference within file
  */
-int
+static int
 biblatexin_readf( FILE *fp, char *buf, int bufsize, int *bufpos, newstr *line, newstr *reference, int *fcharset )
 {
 	int haveref = 0;
@@ -169,7 +178,7 @@ biblatex_tag( char *p, newstr *tag )
 }
 
 static char *
-biblatex_data( char *p, fields *bibin, list *tokens )
+biblatex_data( char *p, fields *bibin, list *tokens, long nref, param *pm )
 {
 	unsigned int nbracket = 0, nquotes = 0;
 	char *startp = p;
@@ -230,10 +239,10 @@ biblatex_data( char *p, fields *bibin, list *tokens )
 	}
 out:
 	if ( nbracket!=0 ) {
-		fprintf( stderr, "%s: Mismatch in number of brackets in reference.\n", progname );
+		fprintf( stderr, "%s: Mismatch in number of brackets in reference %ld\n", pm->progname, nref );
 	}
 	if ( nquotes!=0 ) {
-		fprintf( stderr, "%s: Mismatch in number of quotes in reference.\n", progname );
+		fprintf( stderr, "%s: Mismatch in number of quotes in reference %ld\n", pm->progname, nref );
 	}
 	if ( tok.len ) {
 		s = list_add( tokens, &tok );
@@ -249,7 +258,7 @@ outerr:
  * do string replacement -- only if unprotected by quotation marks or curly brackets
  */
 static void
-replace_strings( list *tokens, fields *bibin )
+replace_strings( list *tokens, fields *bibin, long nref, param *pm )
 {
 	int i, n, ok;
 	newstr *s;
@@ -272,7 +281,7 @@ replace_strings( list *tokens, fields *bibin )
 				if ( !ok ) {
 					fprintf( stderr, "%s: Warning: Non-numeric "
 					   "BibTeX elements should be in quotations or "
-					   "curly brackets in reference.\n", progname );
+					   "curly brackets in reference %ld\n", pm->progname, nref );
 				}
 			}
 		}
@@ -281,7 +290,7 @@ replace_strings( list *tokens, fields *bibin )
 }
 
 static int
-string_concatenate( list *tokens, fields *bibin )
+string_concatenate( list *tokens, fields *bibin, long nref, param *pm )
 {
 	int i, status;
 	newstr *s, *t;
@@ -291,7 +300,7 @@ string_concatenate( list *tokens, fields *bibin )
 		if ( !strcmp( s->data, "#" ) ) {
 			if ( i==0 || i==tokens->n-1 ) {
 				fprintf( stderr, "%s: Warning: Stray string concatenation "
-					"('#' character) in reference\n", progname );
+					"('#' character) in reference %ld\n", pm->progname, nref );
 				status = list_remove( tokens, i );
 				if ( status!=LIST_OK ) return BIBL_ERR_MEMERR;
 				continue;
@@ -299,11 +308,11 @@ string_concatenate( list *tokens, fields *bibin )
 			s = list_get( tokens, i-1 );
 			if ( s->data[0]!='\"' && s->data[s->len-1]!='\"' )
 				fprintf( stderr, "%s: Warning: String concentation should "
-					"be used in context of quotations marks.\n", progname );
+					"be used in context of quotations marks in reference %ld\n", pm->progname, nref );
 			t = list_get( tokens, i+1 );
 			if ( t->data[0]!='\"' && t->data[s->len-1]!='\"' )
 				fprintf( stderr, "%s: Warning: String concentation should "
-					"be used in context of quotations marks.\n", progname );
+					"be used in context of quotations marks in reference %ld\n", pm->progname, nref );
 			if ( ( s->data[s->len-1]=='\"' && t->data[0]=='\"') || (s->data[s->len-1]=='}' && t->data[0]=='{') ) {
 				newstr_trimend( s, 1 );
 				newstr_trimbegin( t, 1 );
@@ -321,7 +330,7 @@ string_concatenate( list *tokens, fields *bibin )
 }
 
 static char *
-process_biblatexline( char *p, newstr *tag, newstr *data, uchar stripquotes )
+process_biblatexline( char *p, newstr *tag, newstr *data, uchar stripquotes, long nref, param *pm )
 {
 	int i, status;
 	list tokens;
@@ -334,11 +343,11 @@ process_biblatexline( char *p, newstr *tag, newstr *data, uchar stripquotes )
 
 	list_init( &tokens );
 
-	if ( *p=='=' ) p = biblatex_data( p+1, NULL, &tokens );
+	if ( *p=='=' ) p = biblatex_data( p+1, NULL, &tokens, nref, pm );
 
-	replace_strings( &tokens, NULL );
+	replace_strings( &tokens, NULL, nref, pm );
 
-	status = string_concatenate( &tokens, NULL );
+	status = string_concatenate( &tokens, NULL, nref, pm );
 	if ( status!=BIBL_OK ) {
 		p = NULL;
 		goto out;
@@ -359,7 +368,7 @@ out:
 }
 
 static int
-process_cite( fields *bibin, char *p, char *filename, long nref )
+process_cite( fields *bibin, char *p, char *filename, long nref, param *pm )
 {
 	int fstatus, status = BIBL_OK;
 	newstr tag, data;
@@ -375,7 +384,7 @@ process_cite( fields *bibin, char *p, char *filename, long nref )
 		if ( fstatus!=FIELDS_OK ) { status = BIBL_ERR_MEMERR; goto out; }
 	}
 	while ( *p ) {
-		p = process_biblatexline( p, &tag, &data, 1 );
+		p = process_biblatexline( p, &tag, &data, 1, nref, pm );
 		if ( !p ) { status = BIBL_ERR_MEMERR; goto out; }
 		/* no anonymous or empty fields allowed */
 		if ( tag.len && data.len ) {
@@ -401,14 +410,14 @@ out:
  *
  */
 static int
-process_string( char *p )
+process_string( char *p, long nref, param *pm )
 {
 	int n, status = BIBL_OK;
 	newstr s1, s2, *s;
 	newstrs_init( &s1, &s2, NULL );
 	while ( *p && *p!='{' && *p!='(' ) p++;
 	if ( *p=='{' || *p=='(' ) p++;
-	p = process_biblatexline( skip_ws( p ), &s1, &s2, 0 );
+	p = process_biblatexline( skip_ws( p ), &s1, &s2, 0, nref, pm );
 	if ( s2.data ) {
 		newstr_findreplace( &s2, "\\ ", " " );
 		if ( newstr_memerr( &s2 ) ) { status = BIBL_ERR_MEMERR; goto out; }
@@ -432,14 +441,14 @@ out:
 	return status;
 }
 
-int
-biblatexin_processf( fields *bibin, char *data, char *filename, long nref )
+static int
+biblatexin_processf( fields *bibin, char *data, char *filename, long nref, param *p )
 {
 	if ( !strncasecmp( data, "@STRING", 7 ) ) {
-		process_string( data+7 );
+		process_string( data+7, nref, p );
 		return 0;
         } else {
-		process_cite( bibin, data, filename, nref );
+		process_cite( bibin, data, filename, nref, p );
 		return 1;
 	}
 }
@@ -769,7 +778,7 @@ biblatexin_cleanref( fields *bibin, param *p )
 	return BIBL_OK;
 }
 
-int
+static int
 biblatexin_cleanf( bibl *bin, param *p )
 {
 	int status;
@@ -786,9 +795,8 @@ biblatexin_cleanf( bibl *bin, param *p )
  PUBLIC: void biblatexin_typef()
 *****************************************************/
 
-int
-biblatexin_typef( fields *bibin, char *filename, int nrefs, param *p,
-                variants *all, int nall )
+static int
+biblatexin_typef( fields *bibin, char *filename, int nrefs, param *p )
 {
         char *refnum = "";
         int reftype, n, nrefnum;
@@ -798,239 +806,16 @@ biblatexin_typef( fields *bibin, char *filename, int nrefs, param *p,
         if ( n!=-1 )
                 /* figure out type */
                 reftype = get_reftype( (bibin->data[n]).data, nrefs,
-                        p->progname, all, nall, refnum );
+                        p->progname, p->all, p->nall, refnum );
         else
                 /* no type info, go for default */
-                reftype = get_reftype( "", nrefs, p->progname, all, nall, refnum );
+                reftype = get_reftype( "", nrefs, p->progname, p->all, p->nall, refnum );
         return reftype;
 }
 
 /*****************************************************
  PUBLIC: int biblatexin_convertf(), returns BIBL_OK or BIBL_ERR_MEMERR
 *****************************************************/
-
-/* is_utf8_emdash()
- *
- * Internally pages="A---B" will convert --- to a UTF8
- * emdash = 0xE2 (-30) 0x80 (-128) 0x94 (-108)
- */
-static int
-is_utf8_emdash( char *p )
-{
-	static char emdash[3] = { -30, -128, -108 };
-	if ( strncmp( p, emdash, 3 ) ) return 0;
-	return 1;
-}
-/* is_utf8_endash()
- *
- * Internally pages="A--B" will convert -- to a UTF8
- * endash = 0xE2 (-30) 0x80 (-128) 0x93 (-109)
- */
-static int
-is_utf8_endash( char *p )
-{
-	static char endash[3] = { -30, -128, -109 };
-	if ( strncmp( p, endash, 3 ) ) return 0;
-	return 1;
-}
-
-static int
-process_pages( fields *info, newstr *s, int level )
-{
-	int fstatus, status = BIBL_OK;
-	newstr page;
-	char *p;
-
-	newstr_findreplace( s, " ", "" );
-	if ( s->len==0 ) return status;
-
-	newstr_init( &page );
-	p = skip_ws( s->data );
-	while ( *p && !is_ws(*p) && *p!='-' && *p!=-30 )
-		newstr_addchar( &page, *p++ );
-	if ( page.len>0 ) {
-		fstatus = fields_add( info, "PAGESTART", page.data, level );
-		if ( fstatus!=FIELDS_OK ) { status = BIBL_ERR_MEMERR; goto out; }
-	}
-
-	while ( *p && (is_ws(*p) || *p=='-' ) ) p++;
-	if ( *p && is_utf8_emdash( p ) ) p+=3;
-	if ( *p && is_utf8_endash( p ) ) p+=3;
-
-	newstr_empty( &page );
-	while ( *p && !is_ws(*p) && *p!='-' && *p!=-30 )
-		newstr_addchar( &page, *p++ );
-	if ( page.len>0 ) {
-		fstatus = fields_add( info, "PAGEEND", page.data, level );
-		if ( fstatus!=FIELDS_OK ) { status = BIBL_ERR_MEMERR; goto out; }
-	}
-out:
-	newstr_free( &page );
-	return status;
-}
-
-static int
-process_url( fields *info, char *p, int level )
-{
-	int fstatus;
-	if ( !strncasecmp( p, "\\urllink", 8 ) )
-		fstatus = fields_add( info, "URL", p+8, level );
-	else if ( !strncasecmp( p, "\\url", 4 ) )
-		fstatus = fields_add( info, "URL", p+4, level );
-	else if ( !strncasecmp( p, "arXiv:", 6 ) )
-		fstatus = fields_add( info, "ARXIV", p+6, level ); 
-	else if ( !strncasecmp( p, "http://arxiv.org/abs/", 21 ) )
-		fstatus = fields_add( info, "ARXIV", p+21, level );
-	else if ( !strncasecmp( p, "http:", 5 ) )
-		fstatus = fields_add( info, "URL", p, level );
-	else 
-		fstatus = fields_add( info, "URL", p, level );
-	if ( fstatus==FIELDS_OK ) return BIBL_OK;
-	else return BIBL_ERR_MEMERR;
-}
-
-
-/* process_howpublished()
- *
- *    howpublished={},
- *
- * Normally indicates the manner in which something was
- * published in lieu of a formal publisher, so typically
- * 'howpublished' and 'publisher' will never be in the
- * same reference.
- *
- * Occasionally, people put Diploma thesis information
- * into this field, so check for that first.
- */
-static int
-process_howpublished( fields *info, char *p, int level )
-{
-	int fstatus;
-        if ( !strncasecmp( p, "Diplom", 6 ) )
-                fstatus = fields_replace_or_add( info, "NGENRE", "Diploma thesis", level );
-        else if ( !strncasecmp( p, "Habilitation", 13 ) )
-                fstatus = fields_replace_or_add( info, "NGENRE", "Habilitation thesis", level );
-        else
-		fstatus = fields_add( info, "PUBLISHER", p, level );
-	if ( fstatus==FIELDS_OK ) return BIBL_OK;
-	else return BIBL_ERR_MEMERR;
-}
-
-static int
-process_thesistype( fields *info, char *p, int level )
-{
-	int fstatus = FIELDS_OK;
-	/* type in the @thesis is used to distinguish Ph.D. and Master's thesis */
-	if ( !strncasecmp( p, "phdthesis", 9 ) ) {
-		fstatus = fields_replace_or_add( info, "NGENRE", "Ph.D. thesis", level );
-	} else if ( !strncasecmp( p, "mastersthesis", 13 ) || !strncasecmp( p, "masterthesis", 12 ) ) {
-		fstatus = fields_replace_or_add( info, "NGENRE", "Masters thesis", level );
-	} else if ( !strncasecmp( p, "mathesis", 8 ) ) {
-		fstatus = fields_replace_or_add( info, "NGENRE", "Masters thesis", level );
-	} else if ( !strncasecmp( p, "diploma", 7 ) ) {
-		fstatus = fields_replace_or_add( info, "NGENRE", "Diploma thesis", level );
-	} else if ( !strncasecmp( p, "habilitation", 12 ) ) {
-		fstatus = fields_replace_or_add( info, "NGENRE", "Habilitation thesis", level );
-	}
-	if ( fstatus==FIELDS_OK ) return BIBL_OK;
-	else return BIBL_ERR_MEMERR;
-}
-
-/* biblatex drops school field if institution is present */
-static int
-process_school( fields *bibin, fields *info, char *tag, char *value, int level )
-{
-	int fstatus;
-	if ( fields_find( bibin, "institution", LEVEL_ANY ) != -1 )
-		return BIBL_OK;
-	else {
-		fstatus = fields_add( info, tag, value, level );
-		if ( fstatus==FIELDS_OK ) return BIBL_OK;
-		else return BIBL_ERR_MEMERR;
-	}
-}
-
-/* biblatex drops school field if institution is present */
-static int
-process_subtype( fields *bibin, fields *info, char *tag, char *value, int level )
-{
-	int fstatus;
-	if ( !strcasecmp( value, "magazine" ) ) {
-		fstatus = fields_add( info, "NGENRE", "magazine article", LEVEL_MAIN );
-		if ( fstatus!=FIELDS_OK ) return BIBL_ERR_MEMERR;
-		fstatus = fields_add( info, "NGENRE", "magazine", LEVEL_HOST );
-		if ( fstatus!=FIELDS_OK ) return BIBL_ERR_MEMERR;
-	} else if ( !strcasecmp( value, "newspaper" ) ) {
-		fstatus = fields_add( info, "NGENRE", "newspaper article", LEVEL_MAIN );
-		if ( fstatus!=FIELDS_OK ) return BIBL_ERR_MEMERR;
-		fstatus = fields_add( info, "GENRE", "newspaper", LEVEL_HOST );
-		if ( fstatus!=FIELDS_OK ) return BIBL_ERR_MEMERR;
-	}
-	return BIBL_OK;
-}
-
-static int
-process_eprint( fields *bibin, fields *info, int level )
-{
-	int neprint, netype, fstatus;
-	char *eprint = NULL, *etype = NULL;
-	neprint = fields_find( bibin, "eprint", -1 );
-	netype  = fields_find( bibin, "eprinttype", -1 );
-	if ( neprint!=-1 ) eprint = bibin->data[neprint].data;
-	if ( netype!=-1 ) etype = bibin->data[netype].data;
-	if ( eprint && etype ) {
-		if ( !strncasecmp( etype, "arxiv", 5 ) ) {
-			fstatus = fields_add( info, "ARXIV", eprint, level );
-			if ( fstatus!=FIELDS_OK ) return BIBL_ERR_MEMERR;
-		} else if ( !strncasecmp( etype, "jstor", 5 ) ) {
-			fstatus = fields_add( info, "JSTOR", eprint, level );
-			if ( fstatus!=FIELDS_OK ) return BIBL_ERR_MEMERR;
-		} else if ( !strncasecmp( etype, "pubmed", 6 ) ) {
-			fstatus = fields_add( info, "PMID", eprint, level );
-			if ( fstatus!=FIELDS_OK ) return BIBL_ERR_MEMERR;
-		} else if ( !strncasecmp( etype, "medline", 7 ) ) {
-			fstatus = fields_add( info, "MEDLINE", eprint, level );
-			if ( fstatus!=FIELDS_OK ) return BIBL_ERR_MEMERR;
-		} else {
-			fstatus = fields_add( info, "EPRINT", eprint, level );
-			if ( fstatus!=FIELDS_OK ) return BIBL_ERR_MEMERR;
-			fstatus = fields_add( info, "EPRINTTYPE", etype, level );
-			if ( fstatus!=FIELDS_OK ) return BIBL_ERR_MEMERR;
-		}
-		fields_setused( bibin, neprint );
-		fields_setused( bibin, netype );
-	} else if ( eprint ) {
-		fstatus = fields_add( info, "EPRINT", eprint, level );
-		if ( fstatus!=FIELDS_OK ) return BIBL_ERR_MEMERR;
-		fields_setused( bibin, neprint );
-	} else if ( etype ) {
-		fstatus = fields_add( info, "EPRINTTYPE", etype, level );
-		if ( fstatus!=FIELDS_OK ) return BIBL_ERR_MEMERR;
-		fields_setused( bibin, netype );
-	}
-	return BIBL_OK;
-}
-
-static void
-report( fields *f )
-{
-	int i, n;
-	n = fields_num( f );
-	for ( i=0; i<n; ++i )
-		fprintf(stderr, "%d '%s' = '%s'\n",
-			fields_level( f, i ),
-			(char*)fields_tag( f, i, FIELDS_CHRP_NOUSE ),
-			(char*)fields_value( f, i, FIELDS_CHRP_NOUSE ) );
-}
-
-static void
-biblatexin_notag( param *p, char *tag )
-{
-	if ( p->verbose && strcmp( tag, "INTERNAL_TYPE" ) ) {
-		if ( p->progname ) fprintf( stderr, "%s: ", p->progname );
-		fprintf( stderr, " Cannot find tag '%s'\n", tag );
-	}
-}
 
 /* get_title_elements()
  *
@@ -1047,7 +832,7 @@ static int
 get_title_elements( fields *bibin, int currlevel, int reftype, variants *all, int nall,
 	newstr *ttl, newstr *subttl, newstr *ttladdon )
 {
-	int nfields, process, level, i, n;
+	int nfields, process, level, i;
 	newstr *t, *d;
 	char *newtag;
 
@@ -1065,8 +850,8 @@ get_title_elements( fields *bibin, int currlevel, int reftype, variants *all, in
 		d = fields_value( bibin, i, FIELDS_STRP_NOUSE );
 		if ( d->len == 0 ) continue;
 
-		n = translate_oldtag( t->data, reftype, all, nall, &process, &level, &newtag );
-		if ( n==-1 ) continue;
+		if ( !translate_oldtag( t->data, reftype, all, nall, &process, &level, &newtag ) )
+			continue;
 		if ( process != TITLE ) continue;
 		if ( level != currlevel ) continue;
 
@@ -1145,14 +930,13 @@ process_separated_title( fields *info, newstr *ttl, newstr *subttl, newstr *ttla
 }
 
 static int
-process_title_all( fields *bibin, fields *info, int reftype, param *p,
-	variants *all, int nall )
+process_title_all( fields *bibin, fields *info, int reftype, param *p )
 {
 	int currlevel, found, status = BIBL_OK;
 	newstr ttl, subttl, ttladdon;
 	newstrs_init( &ttl, &subttl, &ttladdon, NULL );
 	for ( currlevel = 0; currlevel<LEVEL_SERIES+2; currlevel++ ) {
-		found = get_title_elements( bibin, currlevel, reftype, all, nall,
+		found = get_title_elements( bibin, currlevel, reftype, p->all, p->nall,
 				&ttl, &subttl, &ttladdon );
 		if ( !found ) continue;
 		if ( p->nosplittitle )
@@ -1252,6 +1036,168 @@ out:
 	return status;
 }
 
+static int
+biblatexin_bltsubtype( fields *bibin, newstr *intag, newstr *invalue, int level, param *pm, char *outtag, fields *bibout )
+{
+	int fstatus1, fstatus2;
+
+	if ( !strcasecmp( invalue->data, "magazine" ) ) {
+		fstatus1 = fields_add( bibout, "NGENRE", "magazine article", LEVEL_MAIN );
+		fstatus2 = fields_add( bibout, "NGENRE", "magazine",         LEVEL_HOST );
+		if ( fstatus1!=FIELDS_OK || fstatus2!=FIELDS_OK ) return BIBL_ERR_MEMERR;
+	}
+
+	else if ( !strcasecmp( invalue->data, "newspaper" ) ) {
+		fstatus1 = fields_add( bibout, "NGENRE", "newspaper article", LEVEL_MAIN );
+		fstatus2 = fields_add( bibout, "GENRE",  "newspaper",         LEVEL_HOST );
+		if ( fstatus1!=FIELDS_OK || fstatus2!=FIELDS_OK ) return BIBL_ERR_MEMERR;
+	}
+
+	return BIBL_OK;
+}
+
+/* biblatex drops school field if institution is present */
+static int
+biblatexin_bltschool( fields *bibin, newstr *intag, newstr *invalue, int level, param *pm, char *outtag, fields *bibout )
+{
+	int fstatus;
+	if ( fields_find( bibin, "institution", LEVEL_ANY ) != -1 )
+		return BIBL_OK;
+	else {
+		fstatus = fields_add( bibout, outtag, invalue->data, level );
+		if ( fstatus==FIELDS_OK ) return BIBL_OK;
+		else return BIBL_ERR_MEMERR;
+	}
+}
+
+static int
+biblatexin_bltthesistype( fields *bibin, newstr *intag, newstr *invalue, int level, param *pm, char *outtag, fields *bibout )
+{
+	char *p = invalue->data;
+	int fstatus = FIELDS_OK;
+	/* type in the @thesis is used to distinguish Ph.D. and Master's thesis */
+	if ( !strncasecmp( p, "phdthesis", 9 ) ) {
+		fstatus = fields_replace_or_add( bibout, "NGENRE", "Ph.D. thesis", level );
+	} else if ( !strncasecmp( p, "mastersthesis", 13 ) || !strncasecmp( p, "masterthesis", 12 ) ) {
+		fstatus = fields_replace_or_add( bibout, "NGENRE", "Masters thesis", level );
+	} else if ( !strncasecmp( p, "mathesis", 8 ) ) {
+		fstatus = fields_replace_or_add( bibout, "NGENRE", "Masters thesis", level );
+	} else if ( !strncasecmp( p, "diploma", 7 ) ) {
+		fstatus = fields_replace_or_add( bibout, "NGENRE", "Diploma thesis", level );
+	} else if ( !strncasecmp( p, "habilitation", 12 ) ) {
+		fstatus = fields_replace_or_add( bibout, "NGENRE", "Habilitation thesis", level );
+	}
+	if ( fstatus==FIELDS_OK ) return BIBL_OK;
+	else return BIBL_ERR_MEMERR;
+}
+
+static int
+biblatexin_bteprint( fields *bibin, newstr *intag, newstr *invalue, int level, param *pm, char *outtag, fields *bibout )
+{
+	int neprint, netype, fstatus;
+	char *eprint = NULL, *etype = NULL;
+
+	neprint = fields_find( bibin, "eprint", -1 );
+	netype  = fields_find( bibin, "eprinttype", -1 );
+
+	if ( neprint!=-1 ) eprint = bibin->data[neprint].data;
+	if ( netype!=-1 )  etype =  bibin->data[netype].data;
+
+	if ( eprint && etype ) {
+		if ( !strncasecmp( etype, "arxiv", 5 ) ) {
+			fstatus = fields_add( bibout, "ARXIV", eprint, level );
+			if ( fstatus!=FIELDS_OK ) return BIBL_ERR_MEMERR;
+		} else if ( !strncasecmp( etype, "jstor", 5 ) ) {
+			fstatus = fields_add( bibout, "JSTOR", eprint, level );
+			if ( fstatus!=FIELDS_OK ) return BIBL_ERR_MEMERR;
+		} else if ( !strncasecmp( etype, "pubmed", 6 ) ) {
+			fstatus = fields_add( bibout, "PMID", eprint, level );
+			if ( fstatus!=FIELDS_OK ) return BIBL_ERR_MEMERR;
+		} else if ( !strncasecmp( etype, "medline", 7 ) ) {
+			fstatus = fields_add( bibout, "MEDLINE", eprint, level );
+			if ( fstatus!=FIELDS_OK ) return BIBL_ERR_MEMERR;
+		} else {
+			fstatus = fields_add( bibout, "EPRINT", eprint, level );
+			if ( fstatus!=FIELDS_OK ) return BIBL_ERR_MEMERR;
+			fstatus = fields_add( bibout, "EPRINTTYPE", etype, level );
+			if ( fstatus!=FIELDS_OK ) return BIBL_ERR_MEMERR;
+		}
+		fields_setused( bibin, neprint );
+		fields_setused( bibin, netype );
+	} else if ( eprint ) {
+		fstatus = fields_add( bibout, "EPRINT", eprint, level );
+		if ( fstatus!=FIELDS_OK ) return BIBL_ERR_MEMERR;
+		fields_setused( bibin, neprint );
+	} else if ( etype ) {
+		fstatus = fields_add( bibout, "EPRINTTYPE", etype, level );
+		if ( fstatus!=FIELDS_OK ) return BIBL_ERR_MEMERR;
+		fields_setused( bibin, netype );
+	}
+	return BIBL_OK;
+}
+
+static int
+biblatexin_btgenre( fields *bibin, newstr *intag, newstr *invalue, int level, param *pm, char *outtag, fields *bibout )
+{
+	if ( fields_add( bibout, "NGENRE", invalue->data, level ) == FIELDS_OK ) return BIBL_OK;
+	else return BIBL_ERR_MEMERR;
+}
+
+static int
+biblatexin_bturl( fields *bibin, newstr *intag, newstr *invalue, int level, param *pm, char *outtag, fields *bibout )
+{
+	char *p = invalue->data;
+	int fstatus;
+
+	if ( !strncasecmp( p, "\\urllink", 8 ) )
+		fstatus = fields_add( bibout, "URL", p+8, level );
+	else if ( !strncasecmp( p, "\\url", 4 ) )
+		fstatus = fields_add( bibout, "URL", p+4, level );
+	else if ( !strncasecmp( p, "arXiv:", 6 ) )
+		fstatus = fields_add( bibout, "ARXIV", p+6, level );
+	else if ( !strncasecmp( p, "jstor", 5 ) )
+		fstatus = fields_add( bibout, "JSTOR", p+5, level );
+	else if ( !strncasecmp( p, "http://www.jstor.org/stable/", 28 ) )
+		fstatus = fields_add( bibout, "JSTOR", p+28, level );
+	else if ( !strncasecmp( p, "http://arxiv.org/abs/", 21 ) )
+		fstatus = fields_add( bibout, "ARXIV", p+21, level );
+	else if ( !strncasecmp( p, "http:", 5 ) )
+		fstatus = fields_add( bibout, "URL", p, level );
+	else
+		fstatus = fields_add( bibout, "URL", p, level );
+
+	if ( fstatus==FIELDS_OK ) return BIBL_OK;
+	else return BIBL_ERR_MEMERR;
+}
+
+/* biblatexin_howpublished()
+ *
+ *    howpublished={},
+ *
+ * Normally indicates the manner in which something was
+ * published in lieu of a formal publisher, so typically
+ * 'howpublished' and 'publisher' will never be in the
+ * same reference.
+ *
+ * Occasionally, people put Diploma thesis information
+ * into this field, so check for that first.
+ */
+static int
+biblatexin_howpublished( fields *bibin, newstr *intag, newstr *invalue, int level, param *pm, char *outtag, fields *bibout )
+{
+	int fstatus;
+
+        if ( !strncasecmp( invalue->data, "Diplom", 6 ) )
+                fstatus = fields_replace_or_add( bibout, "NGENRE", "Diploma thesis", level );
+        else if ( !strncasecmp( invalue->data, "Habilitation", 13 ) )
+                fstatus = fields_replace_or_add( bibout, "NGENRE", "Habilitation thesis", level );
+        else
+		fstatus = fields_add( bibout, "PUBLISHER", invalue->data, level );
+
+	if ( fstatus==FIELDS_OK ) return BIBL_OK;
+	else return BIBL_ERR_MEMERR;
+}
+
 /*
  * biblatex has multiple editor fields "editor", "editora", "editorb", "editorc",
  * each of which can be modified from a type of "EDITOR" via "editortype",
@@ -1275,42 +1221,66 @@ out:
  *     "none" (for performer)
  */
 static int
-process_editor( fields *bibin, fields *info, newstr *tag, newstr *value, int level, list *asis, list *corps )
+biblatexin_blteditor( fields *bibin, newstr *intag, newstr *invalue, int level, param *pm, char *outtag, fields *bibout )
 {
 	char *editor_fields[] = { "editor", "editora", "editorb", "editorc" };
 	char *editor_types[]  = { "editortype", "editoratype", "editorbtype", "editorctype" };
 	int i, n = 0, ntype, neditors = sizeof( editor_fields ) / sizeof( editor_fields[0] );
-	char *type, *outtag = "EDITOR";
+	char *type, *usetag = "EDITOR";
 	for ( i=1; i<neditors; ++i )
-		if ( !strcasecmp( tag->data, editor_fields[i] ) ) n = i;
+		if ( !strcasecmp( intag->data, editor_fields[i] ) ) n = i;
 	ntype = fields_find( bibin, editor_types[n], LEVEL_ANY );
 	if ( ntype!=-1 ) {
 		type = fields_value( bibin, ntype, FIELDS_CHRP_NOUSE );
-		if ( !strcasecmp( type, "collaborator" ) )  outtag = "COLLABORATOR";
-		else if ( !strcasecmp( type, "compiler" ) ) outtag = "COMPILER";
-		else if ( !strcasecmp( type, "redactor" ) ) outtag = "REDACTOR";
-		else if ( !strcasecmp( type, "director" ) ) outtag = "DIRECTOR";
-		else if ( !strcasecmp( type, "producer" ) ) outtag = "PRODUCER";
-		else if ( !strcasecmp( type, "none" ) )     outtag = "PERFORMER";
+		if ( !strcasecmp( type, "collaborator" ) )  usetag = "COLLABORATOR";
+		else if ( !strcasecmp( type, "compiler" ) ) usetag = "COMPILER";
+		else if ( !strcasecmp( type, "redactor" ) ) usetag = "REDACTOR";
+		else if ( !strcasecmp( type, "director" ) ) usetag = "DIRECTOR";
+		else if ( !strcasecmp( type, "producer" ) ) usetag = "PRODUCER";
+		else if ( !strcasecmp( type, "none" ) )     usetag = "PERFORMER";
 	}
-	return biblatex_names( info, outtag, value, level, asis, corps );
+	return biblatex_names( bibout, usetag, invalue, level, &(pm->asis), &(pm->corps) );
 }
 
 static int
-biblatexin_simple( fields *f, char *tag, char *value, int level )
+biblatexin_person( fields *bibin, newstr *intag, newstr *invalue, int level, param *pm, char *outtag, fields *bibout )
 {
-	int fstatus = fields_add( f, tag, value, level );
-	if ( fstatus==FIELDS_OK ) return BIBL_OK;
-	else return BIBL_ERR_MEMERR;
+	return biblatex_names( bibout, outtag, invalue, level, &(pm->asis), &(pm->corps) );
 }
 
-int
-biblatexin_convertf( fields *bibin, fields *info, int reftype, param *p,
-		variants *all, int nall )
+static void
+biblatexin_notag( param *p, char *tag )
 {
-	int process, level, i, n, nfields, status = BIBL_OK;
-	newstr *t, *d;
-	char *newtag;
+	if ( p->verbose && strcmp( tag, "INTERNAL_TYPE" ) ) {
+		if ( p->progname ) fprintf( stderr, "%s: ", p->progname );
+		fprintf( stderr, " Cannot find tag '%s'\n", tag );
+	}
+}
+
+static int
+biblatexin_convertf( fields *bibin, fields *bibout, int reftype, param *p )
+{
+	static int (*convertfns[NUM_REFTYPES])(fields *, newstr *, newstr *, int, param *, char *, fields *) = {
+		[ 0 ... NUM_REFTYPES-1 ] = generic_null,
+		[ SIMPLE          ] = generic_simple,
+		[ PAGES           ] = generic_pages,
+		[ NOTES           ] = generic_notes,
+		[ PERSON          ] = biblatexin_person,
+		[ BLT_EDITOR      ] = biblatexin_blteditor,
+		[ HOWPUBLISHED    ] = biblatexin_howpublished,
+		[ BT_URL          ] = biblatexin_bturl,
+		[ BT_GENRE        ] = biblatexin_btgenre,
+		[ BT_EPRINT       ] = biblatexin_bteprint,
+		[ BLT_THESIS_TYPE ] = biblatexin_bltthesistype,
+		[ BLT_SCHOOL      ] = biblatexin_bltschool,
+		[ BLT_SUBTYPE     ] = biblatexin_bltsubtype,
+		[ BLT_SKIP        ] = generic_skip,
+		[ TITLE           ] = generic_null,    /* delay processing until later */
+	};
+
+	int process, level, i, nfields, status = BIBL_OK;
+	newstr *intag, *invalue;
+	char *outtag;
 
 	nfields = fields_num( bibin );
 	for ( i=0; i<nfields; ++i ) {
@@ -1319,94 +1289,26 @@ biblatexin_convertf( fields *bibin, fields *info, int reftype, param *p,
                 if ( fields_used( bibin, i ) ) continue;
 
 		/* skip ones with no data or no tags (e.g. don't match ALWAYS/DEFAULT entries) */
-		t = fields_tag  ( bibin, i, FIELDS_STRP_NOUSE );
-		d = fields_value( bibin, i, FIELDS_STRP_NOUSE );
-		if ( t->len == 0 || d->len == 0 ) continue;
+		intag   = fields_tag  ( bibin, i, FIELDS_STRP_NOUSE );
+		invalue = fields_value( bibin, i, FIELDS_STRP_NOUSE );
+		if ( intag->len == 0 || invalue->len == 0 ) continue;
 
-		n = translate_oldtag( t->data, reftype, all, nall, &process, &level, &newtag );
-		if ( n==-1 ) {
-			biblatexin_notag( p, t->data );
+		if ( !translate_oldtag( intag->data, reftype, p->all, p->nall, &process, &level, &outtag ) ) {
+			biblatexin_notag( p, intag->data );
 			continue;
 		}
 
-		switch ( process ) {
-
-		case SIMPLE:
-			status = biblatexin_simple( info, newtag, d->data, level );
-			fields_setused( bibin, i );
-			break;
-
-		case PERSON:
-			status = biblatex_names( info, newtag, d, level, &(p->asis), &(p->corps) );
-			fields_setused( bibin, i );
-			break;
-
-		case BLT_EDITOR:
-			status = process_editor( bibin, info, t, d, level, &(p->asis), &(p->corps) );
-			fields_setused( bibin, i );
-			break;
-
-		case PAGES:
-			status = process_pages( info, d, level);
-			fields_setused( bibin, i );
-			break;
-
-		case HOWPUBLISHED:
-			status = process_howpublished( info, d->data, level );
-			fields_setused( bibin, i );
-			break;
-
-		case BT_URL:
-			status = process_url( info, d->data, level );
-			fields_setused( bibin, i );
-			break;
-
-		case BT_GENRE:
-			status = biblatexin_simple( info, "NGENRE", d->data, level );
-			fields_setused( bibin, i );
-			break;
-
-		case BT_EPRINT:
-			status = process_eprint( bibin, info, level );
-			fields_setused( bibin, i );
-			break;
-
-		case BLT_THESIS_TYPE:
-			status = process_thesistype( info, d->data, level );
-			fields_setused( bibin, i );
-			break;
-
-		case BLT_SCHOOL:
-			status = process_school( bibin, info, newtag, d->data, level );
-			fields_setused( bibin, i );
-			break;
-
-		case BLT_SUBTYPE:
-			status = process_subtype( bibin, info, newtag, d->data, level );
-			fields_setused( bibin, i );
-			break;
-
-		case BLT_SKIP:
-			status = BIBL_OK;
-			fields_setused( bibin, i );
-			break;
-
-		case TITLE:
-			status = BIBL_OK; /* delay title processing until later */
-			break;
-
-		default:
-			status = BIBL_OK;
-			break;
-
-		}
+		status = convertfns[ process ]( bibin, intag, invalue, level, p, outtag, bibout );
 		if ( status!=BIBL_OK ) return status;
+
+		if ( convertfns[ process ] != generic_null )
+			fields_setused( bibin, i );
 
 	}
 
-	status = process_title_all( bibin, info, reftype, p, all, nall );
+	status = process_title_all( bibin, bibout, reftype, p );
 
-	if ( status==BIBL_OK && p->verbose ) report( info );
+	if ( status==BIBL_OK && p->verbose ) fields_report( bibout, stdout );
 
 	return status;
 }

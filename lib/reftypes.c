@@ -52,6 +52,7 @@ translate_oldtag( char *oldtag, int reftype, variants all[], int nall,
 		*processingtype = ((all[reftype]).tags[n]).processingtype;
 		*level          = ((all[reftype]).tags[n]).level;
 		*newtag         = ((all[reftype]).tags[n]).newstr;
+		return 1;
 	}
-	return n;
+	return 0;
 }

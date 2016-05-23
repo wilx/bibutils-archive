@@ -16,19 +16,20 @@
  *
  */
 convert identifier_types[] = {
-                { "citekey", "REFNUM" },
-                { "issn",    "ISSN"   },
-                { "isbn",    "ISBN"   },
-                { "doi",     "DOI"    },
-                { "url",     "URL"    },
-                { "uri",     "URL"    },
-                { "pubmed",  "PUBMED" },
-                { "medline", "MEDLINE" },
-                { "pii",     "PII" },
-                { "isi",     "ISIREFNUM" },
-		{ "lccn",    "LCCN" },
-                { "serial number", "SERIALNUMBER" },
-                { "accessnum", "ACCESSNUM" }
+	{ "citekey",       "REFNUM"    },
+	{ "issn",          "ISSN"      },
+	{ "isbn",          "ISBN"      },
+	{ "doi",           "DOI"       },
+	{ "url",           "URL"       },
+	{ "uri",           "URL"       },
+	{ "pubmed",        "PMID",     },
+	{ "medline",       "MEDLINE"   },
+	{ "pmc",           "PMC"       },
+	{ "pii",           "PII"       },
+	{ "isi",           "ISIREFNUM" },
+	{ "lccn",          "LCCN"      },
+	{ "serial number", "SERIALNUMBER" },
+	{ "accessnum",     "ACCESSNUM"    }
 };
 
 int nidentifier_types = sizeof( identifier_types ) / sizeof( identifier_types[0] );

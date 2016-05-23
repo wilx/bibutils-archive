@@ -16,7 +16,11 @@
 #include "fields.h"
 #include "doi.h"
 #include "name.h"
-#include "risout.h"
+#include "bibformats.h"
+
+static void risout_write( fields *info, FILE *fp, param *p, unsigned long refnum );
+static void risout_writeheader( FILE *outptr, param *p );
+
 
 void
 risout_initparams( param *p, const char *progname )
@@ -367,11 +371,11 @@ static void
 output_date( FILE *fp, fields *f )
 {
 	char *year  = fields_findv_firstof( f, LEVEL_ANY, FIELDS_CHRP,
-			"YEAR", "PARTYEAR", NULL );
+			"DATE:YEAR", "PARTDATE:YEAR", NULL );
 	char *month = fields_findv_firstof( f, LEVEL_ANY, FIELDS_CHRP,
-			"MONTH", "PARTMONTH", NULL );
+			"DATE:MONTH", "PARTDATE:MONTH", NULL );
 	char *day   = fields_findv_firstof( f, LEVEL_ANY, FIELDS_CHRP,
-			"DAY", "PARTDAY", NULL );
+			"DATE:DAY", "PARTDATE:DAY", NULL );
 	if ( year )
 		fprintf( fp, "PY  - %s\n", year );
 	if ( year || month || day ) {
@@ -442,8 +446,8 @@ output_alltitles( FILE *fp, fields *f, int type )
 static void
 output_pages( FILE *fp, fields *f )
 {
-	char *sn = fields_findv( f, LEVEL_ANY, FIELDS_CHRP, "PAGESTART" );
-	char *en = fields_findv( f, LEVEL_ANY, FIELDS_CHRP, "PAGEEND" );
+	char *sn = fields_findv( f, LEVEL_ANY, FIELDS_CHRP, "PAGES:START" );
+	char *en = fields_findv( f, LEVEL_ANY, FIELDS_CHRP, "PAGES:STOP" );
 	char *ar;
 
 	if ( sn || en ) {
@@ -465,6 +469,21 @@ output_keywords( FILE *fp, fields *f )
 	for ( i=0; i<vpl.n; ++i )
 		fprintf( fp, "KW  - %s\n", ( char * ) vplist_get( &vpl, i ) );
 	vplist_free( &vpl );
+}
+
+static void
+output_pmc( FILE *fp, fields *f )
+{
+	newstr s;
+	int i;
+	newstr_init( &s );
+	for ( i=0; i<fields_num( f ); ++i ) {
+		if ( !fields_match_tag( f, i, "PMC" ) ) continue;
+		pmc_to_url( f, i, "URL", &s );
+		if ( s.len )
+			fprintf( fp, "UR  - %s\n", s.data );
+	}
+	newstr_free( &s );
 }
 
 static void
@@ -606,7 +625,7 @@ output_allpeople( FILE *fp, fields *f, int type )
 	output_easyall( fp, f, "EDITOR:ASIS", "A3", LEVEL_SERIES );
 }
 
-void
+static void
 risout_write( fields *f, FILE *fp, param *p, unsigned long refnum )
 {
 	int type;
@@ -642,6 +661,7 @@ risout_write( fields *f, FILE *fp, param *p, unsigned long refnum )
 	output_file(    fp, f, "FIGATTACH",       "L4", LEVEL_ANY );
 	output_easy( fp, f, "CAPTION",            "CA", LEVEL_ANY );
 	output_pmid( fp, f );
+	output_pmc( fp, f );
 	output_arxiv( fp, f );
 	output_jstor( fp, f );
 	output_easy( fp, f, "LANGUAGE",           "LA", LEVEL_ANY );
@@ -652,7 +672,7 @@ risout_write( fields *f, FILE *fp, param *p, unsigned long refnum )
 	fflush( fp );
 }
 
-void
+static void
 risout_writeheader( FILE *outptr, param *p )
 {
 	if ( p->utf8bom ) utf8_writebom( outptr );

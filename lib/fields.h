@@ -45,15 +45,18 @@ extern void fields_clearused( fields *f );
 extern void fields_setused( fields *f, int n );
 extern int  fields_replace_or_add( fields *f, char *tag, char *data, int level );
 
-extern inline int fields_num( fields *f );
-extern inline int fields_used( fields *f, int n );
-extern inline int fields_nodata( fields *f, int n );
+extern int fields_num( fields *f );
+extern int fields_used( fields *f, int n );
+extern int fields_notag( fields *f, int n );
+extern int fields_nodata( fields *f, int n );
 
-extern inline int fields_match_level( fields *f, int n, int level );
-extern inline int fields_match_tag( fields *f, int n, char *tag );
-extern inline int fields_match_casetag( fields *f, int n, char *tag );
-extern inline int fields_match_tag_level( fields *f, int n, char *tag, int level );
-extern inline int fields_match_casetag_level( fields *f, int n, char *tag, int level );
+extern int fields_match_level( fields *f, int n, int level );
+extern int fields_match_tag( fields *f, int n, char *tag );
+extern int fields_match_casetag( fields *f, int n, char *tag );
+extern int fields_match_tag_level( fields *f, int n, char *tag, int level );
+extern int fields_match_casetag_level( fields *f, int n, char *tag, int level );
+
+extern void fields_report( fields *f, FILE *fp );
 
 #define FIELDS_STRP_FLAG     (2)
 #define FIELDS_POSP_FLAG     (4)

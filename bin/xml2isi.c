@@ -9,8 +9,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "bibutils.h"
-#include "modsin.h"
-#include "isiout.h"
+#include "bibformats.h"
 #include "args.h"
 #include "bibprog.h"
 

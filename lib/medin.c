@@ -14,9 +14,13 @@
 #include "fields.h"
 #include "xml.h"
 #include "xml_encoding.h"
-#include "medin.h"
 #include "iso639_2.h"
 #include "bibutils.h"
+#include "bibformats.h"
+
+static int medin_readf( FILE *fp, char *buf, int bufsize, int *bufpos, newstr *line, newstr *reference, int *fcharset );
+static int medin_processf( fields *medin, char *data, char *filename, long nref, param *p );
+
 
 /*****************************************************
  PUBLIC: void medin_initparams()
@@ -82,7 +86,7 @@ medin_findendwrapper( char *buf, int ntype )
 	return endptr;
 }
 
-int
+static int
 medin_readf( FILE *fp, char *buf, int bufsize, int *bufpos, newstr *line, newstr *reference, int *fcharset )
 {
 	newstr tmp;
@@ -178,7 +182,7 @@ medin_medlinedate( fields *info, char *p, int level )
 	p = newstr_cpytodelim( &tmp, skip_ws( p ), " \t\n\r", 0 );
 	if ( newstr_memerr( &tmp ) ) return BIBL_ERR_MEMERR;
 	if ( tmp.len > 0 ) {
-		fstatus = fields_add( info, "PARTYEAR", tmp.data, level );
+		fstatus = fields_add( info, "PARTDATE:YEAR", tmp.data, level );
 		if ( fstatus!=FIELDS_OK ) return BIBL_ERR_MEMERR;
 	}
 
@@ -186,14 +190,14 @@ medin_medlinedate( fields *info, char *p, int level )
 	if ( newstr_memerr( &tmp ) ) return BIBL_ERR_MEMERR;
 	if ( tmp.len > 0 ) {
 		newstr_findreplace( &tmp, "-", "/" );
-		fstatus = fields_add( info, "PARTMONTH", tmp.data, level );
+		fstatus = fields_add( info, "PARTDATE:MONTH", tmp.data, level );
 		if ( fstatus!=FIELDS_OK ) return BIBL_ERR_MEMERR;
 	}
 
 	p = newstr_cpytodelim( &tmp, skip_ws( p ), " \t\n\r", 0 );
 	if ( newstr_memerr( &tmp ) ) return BIBL_ERR_MEMERR;
 	if ( tmp.len > 0 ) {
-		fstatus = fields_add( info, "PARTDAY", tmp.data, level );
+		fstatus = fields_add( info, "PARTDATE:DAY", tmp.data, level );
 		if ( fstatus!=FIELDS_OK ) return BIBL_ERR_MEMERR;
 	}
 
@@ -252,14 +256,14 @@ static int
 medin_journal1( xml *node, fields *info )
 {
 	xml_convert c[] = {
-		{ "Title",           NULL, NULL, "TITLE",      1 },
-		{ "ISOAbbreviation", NULL, NULL, "SHORTTITLE", 1 },
-		{ "ISSN",            NULL, NULL, "ISSN",       1 },
-		{ "Volume",          NULL, NULL, "VOLUME",     1 },
-		{ "Issue",           NULL, NULL, "ISSUE",      1 },
-		{ "Year",            NULL, NULL, "PARTYEAR",   1 },
-		{ "Month",           NULL, NULL, "PARTMONTH",  1 },
-		{ "Day",             NULL, NULL, "PARTDAY",    1 },
+		{ "Title",           NULL, NULL, "TITLE",          1 },
+		{ "ISOAbbreviation", NULL, NULL, "SHORTTITLE",     1 },
+		{ "ISSN",            NULL, NULL, "ISSN",           1 },
+		{ "Volume",          NULL, NULL, "VOLUME",         1 },
+		{ "Issue",           NULL, NULL, "ISSUE",          1 },
+		{ "Year",            NULL, NULL, "PARTDATE:YEAR",  1 },
+		{ "Month",           NULL, NULL, "PARTDATE:MONTH", 1 },
+		{ "Day",             NULL, NULL, "PARTDATE:DAY",   1 },
 	};
 	int nc = sizeof( c ) / sizeof( c[0] ), status, found;
 	if ( xml_hasdata( node ) ) {
@@ -302,7 +306,7 @@ medin_pagination( xml *node, fields *info )
 		p = newstr_cpytodelim( &sp, xml_data( node ), "-", 1 );
 		if ( newstr_memerr( &sp ) ) return BIBL_ERR_MEMERR;
 		if ( sp.len ) {
-			fstatus = fields_add( info, "PAGESTART", sp.data, 1 );
+			fstatus = fields_add( info, "PAGES:START", sp.data, 1 );
 			if ( fstatus!=FIELDS_OK ) return BIBL_ERR_MEMERR;
 		}
 		p = newstr_cpytodelim( &ep, p, "", 0 );
@@ -313,7 +317,7 @@ medin_pagination( xml *node, fields *info )
 					sp.data[i] = ep.data[i-sp.len+ep.len];
 				pp = sp.data;
 			} else  pp = ep.data;
-			fstatus = fields_add( info, "PAGEEND", pp, 1 );
+			fstatus = fields_add( info, "PAGES:STOP", pp, 1 );
 			if ( fstatus!=FIELDS_OK ) return BIBL_ERR_MEMERR;
 		}
 		newstrs_free( &sp, &ep, NULL );
@@ -491,7 +495,7 @@ medin_meshheadinglist( xml *node, fields *info )
  *         <ArticleId IdType="pubmed">14523232</ArticleId>
  *         <ArticleId IdType="doi">10.1073/pnas.2133463100</ArticleId>
  *         <ArticleId IdType="pii">2133463100</ArticleId>
- *         <ArticleId IdType="medline">22922082</ArticleId>
+ *         <ArticleId IdType="pmc">PMC4833866</ArticleId>
  *     </ArticleIdList>
  * </PubmedData>
  *
@@ -504,6 +508,7 @@ medin_pubmeddata( xml *node, fields *info )
 		{ "ArticleId", "IdType", "doi",     "DOI",     0 },
 		{ "ArticleId", "IdType", "pubmed",  "PMID",    0 },
 		{ "ArticleId", "IdType", "medline", "MEDLINE", 0 },
+		{ "ArticleId", "IdType", "pmc",     "PMC",     0 },
 		{ "ArticleId", "IdType", "pii",     "PII",     0 },
 	};
 	int nc = sizeof( c ) / sizeof( c[0] ), found, status;
@@ -616,8 +621,8 @@ medin_assembleref( xml *node, fields *info )
 	return status;
 }
 
-int
-medin_processf( fields *medin, char *data, char *filename, long nref )
+static int
+medin_processf( fields *medin, char *data, char *filename, long nref, param *p )
 {
 	int status;
 	xml top;

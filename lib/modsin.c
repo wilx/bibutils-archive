@@ -24,7 +24,10 @@
 #include "iso639_2.h"
 #include "iso639_3.h"
 #include "bibutils.h"
-#include "modsin.h"
+#include "bibformats.h"
+
+static int modsin_readf( FILE *fp, char *buf, int bufsize, int *bufpos, newstr *line, newstr *reference, int *fcharset );
+static int modsin_processf( fields *medin, char *data, char *filename, long nref, param *p );
 
 /*****************************************************
  PUBLIC: void modsin_initparams()
@@ -102,7 +105,7 @@ modsin_detail( xml *node, fields *info, int level )
 		status = modsin_detailr( node->down, &value );
 		if ( status!=BIBL_OK ) goto out;
 		if ( type.data && !strcasecmp( type.data, "PAGE" ) ) {
-			fstatus = fields_add( info, "PAGESTART", value.data, level );
+			fstatus = fields_add( info, "PAGES:START", value.data, level );
 		} else {
 			fstatus = fields_add( info, type.data, value.data, level );
 		}
@@ -126,7 +129,7 @@ modsin_date( xml *node, fields *info, int level, int part )
 		p = newstr_cpytodelim( &s, skip_ws( p ), "-", 1 );
 		if ( newstr_memerr( &s ) ) { status = BIBL_ERR_MEMERR; goto out; }
 		if ( s.len ) {
-			tag = ( part ) ? "PARTYEAR" : "YEAR";
+			tag = ( part ) ? "PARTDATE:YEAR" : "DATE:YEAR";
 			fstatus =  fields_add( info, tag, s.data, level );
 			if ( fstatus!=FIELDS_OK ) { status = BIBL_ERR_MEMERR; goto out; }
 		}
@@ -134,7 +137,7 @@ modsin_date( xml *node, fields *info, int level, int part )
 		p = newstr_cpytodelim( &s, skip_ws( p ), "-", 1 );
 		if ( newstr_memerr( &s ) ) { status = BIBL_ERR_MEMERR; goto out; }
 		if ( s.len ) {
-			tag = ( part ) ? "PARTMONTH" : "MONTH";
+			tag = ( part ) ? "PARTDATE:MONTH" : "DATE:MONTH";
 			fstatus =  fields_add( info, tag, s.data, level );
 			if ( fstatus!=FIELDS_OK ) { status = BIBL_ERR_MEMERR; goto out; }
 		}
@@ -142,7 +145,7 @@ modsin_date( xml *node, fields *info, int level, int part )
 		p = newstr_cpytodelim( &s, skip_ws( p ), "", 0 );
 		if ( newstr_memerr( &s ) ) { status = BIBL_ERR_MEMERR; goto out; }
 		if ( s.len ) {
-			tag = ( part ) ? "PARTDAY" : "DAY";
+			tag = ( part ) ? "PARTDATE:DAY" : "DATE:DAY";
 			fstatus =  fields_add( info, tag, s.data, level );
 			if ( fstatus!=FIELDS_OK ) { status = BIBL_ERR_MEMERR; goto out; }
 		}
@@ -194,19 +197,19 @@ modsin_page( xml *node, fields *info, int level )
 
 	if ( sp.len || ep.len ) {
 		if ( sp.len ) {
-			fstatus = fields_add( info, "PAGESTART", sp.data, level );
+			fstatus = fields_add( info, "PAGES:START", sp.data, level );
 			if ( fstatus!=FIELDS_OK ) { status = BIBL_ERR_MEMERR; goto out; }
 		}
 		if ( ep.len ) {
-			fstatus = fields_add( info, "PAGEEND", ep.data, level );
+			fstatus = fields_add( info, "PAGES:STOP", ep.data, level );
 			if ( fstatus!=FIELDS_OK ) { status = BIBL_ERR_MEMERR; goto out; }
 		}
 	} else if ( lp.len ) {
-		fstatus = fields_add( info, "PAGESTART", lp.data, level );
+		fstatus = fields_add( info, "PAGES:START", lp.data, level );
 		if ( fstatus!=FIELDS_OK ) { status = BIBL_ERR_MEMERR; goto out; }
 	}
 	if ( tp.len ) {
-		fstatus = fields_add( info, "TOTALPAGES", tp.data, level );
+		fstatus = fields_add( info, "PAGES:TOTAL", tp.data, level );
 		if ( fstatus!=FIELDS_OK ) { status = BIBL_ERR_MEMERR; goto out; }
 	}
 out:
@@ -870,6 +873,7 @@ modsin_identifier( xml *node, fields *info, int level )
 		{ "pmid",          "PMID",        0, 0 },
 		{ "pubmed",        "PMID",        0, 0 },
 		{ "medline",       "MEDLINE",     0, 0 },
+		{ "pmc",           "PMC",         0, 0 },
 		{ "arXiv",         "ARXIV",       0, 0 },
 		{ "pii",           "PII",         0, 0 },
 		{ "isi",           "ISIREFNUM",   0, 0 },
@@ -975,8 +979,8 @@ modsin_assembleref( xml *node, fields *info )
 	return status;
 }
 
-int
-modsin_processf( fields *modsin, char *data, char *filename, long nref )
+static int
+modsin_processf( fields *modsin, char *data, char *filename, long nref, param *p )
 {
 	int status;
 	xml top;
@@ -1015,7 +1019,7 @@ modsin_endptr( char *p )
 	return xml_findend( p, "mods" );
 }
 
-int
+static int
 modsin_readf( FILE *fp, char *buf, int bufsize, int *bufpos, newstr *line,
 		newstr *reference, int *fcharset )
 {

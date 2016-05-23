@@ -15,15 +15,23 @@
 #include "newstr.h"
 #include "newstr_conv.h"
 #include "fields.h"
-#include "name.h"
-#include "title.h"
-#include "serialno.h"
 #include "reftypes.h"
-#include "endin.h"
+#include "bibformats.h"
+#include "generic.h"
+
+extern variants end_all[];
+extern int end_nall;
 
 /*****************************************************
  PUBLIC: void endin_initparams()
 *****************************************************/
+
+static int endin_readf( FILE *fp, char *buf, int bufsize, int *bufpos, newstr *line, newstr *reference, int *fcharset );
+static int endin_processf( fields *endin, char *p, char *filename, long nref, param *pm );
+int endin_typef( fields *endin, char *filename, int nrefs, param *p );
+int endin_convertf( fields *endin, fields *info, int reftype, param *p );
+int endin_cleanf( bibl *bin, param *p );
+
 void
 endin_initparams( param *p, const char *progname )
 {
@@ -82,7 +90,7 @@ readmore( FILE *fp, char *buf, int bufsize, int *bufpos, newstr *line )
 	else return newstr_fget( fp, buf, bufsize, bufpos, line );
 }
 
-int
+static int
 endin_readf( FILE *fp, char *buf, int bufsize, int *bufpos, newstr *line, newstr *reference, int *fcharset )
 {
 	int haveref = 0, inref = 0;
@@ -156,8 +164,8 @@ process_endline2( newstr *tag, newstr *data, char *p )
 	return p;
 }
 
-int
-endin_processf( fields *endin, char *p, char *filename, long nref )
+static int
+endin_processf( fields *endin, char *p, char *filename, long nref, param *pm )
 {
 	newstr tag, data;
 	int status, n;
@@ -201,8 +209,7 @@ endin_processf( fields *endin, char *p, char *filename, long nref )
  * if !%B & !%J & !%R & !%I - journal article
  */
 int
-endin_typef( fields *endin, char *filename, int nrefs, param *p, 
-	variants *all, int nall )
+endin_typef( fields *endin, char *filename, int nrefs, param *p )
 {
 	char *refnum = "";
 	int n, reftype, nrefnum, nj, nv, nb, nr, nt, ni;
@@ -211,7 +218,7 @@ endin_typef( fields *endin, char *filename, int nrefs, param *p,
 	if ( nrefnum!=-1 ) refnum = endin->data[nrefnum].data;
 	if ( n!=-1 ) {
 		reftype = get_reftype( endin->data[n].data, nrefs, 
-			p->progname, all, nall, refnum );
+			p->progname, p->all, p->nall, refnum );
 	} else {
 		nj = fields_find( endin, "%J", 0 );
 		nv = fields_find( endin, "%V", 0 );
@@ -221,22 +228,22 @@ endin_typef( fields *endin, char *filename, int nrefs, param *p,
 		ni = fields_find( endin, "%I", 0 );
 		if ( nj!=-1 && nv!=-1 ) {
 			reftype = get_reftype( "Journal Article", nrefs,
-					p->progname, all, nall, refnum );
+					p->progname, p->all, p->nall, refnum );
 		} else if ( nb!=-1 ) {
 			reftype = get_reftype( "Book Section", nrefs,
-					p->progname, all, nall, refnum );
+					p->progname, p->all, p->nall, refnum );
 		} else if ( nr!=-1 && nt==-1 ) {
 			reftype = get_reftype( "Report", nrefs,
-					p->progname, all, nall, refnum );
+					p->progname, p->all, p->nall, refnum );
 		} else if ( ni!=-1 && nb==-1 && nj==-1 && nr==-1 ) {
 			reftype = get_reftype( "Book", nrefs,
-					p->progname, all, nall, refnum );
+					p->progname, p->all, p->nall, refnum );
 		} else if ( nb==-1 && nj==-1 && nr==-1 && ni==-1 ) {
 			reftype = get_reftype( "Journal Article", nrefs,
-					p->progname, all, nall, refnum );
+					p->progname, p->all, p->nall, refnum );
 		} else {
 			reftype = get_reftype( "", nrefs, p->progname, 
-					all, nall, refnum ); /* default */
+					p->all, p->nall, refnum ); /* default */
 		}
 	}
 	return reftype;
@@ -332,35 +339,6 @@ endin_cleanf( bibl *bin, param *p )
  PUBLIC: int endin_convertf(), returns BIBL_OK or BIBL_ERR_MEMERR
 *****************************************************/
 
-static int
-endin_addpage( fields *info, char *p, int level )
-{
-	newstr page;
-	int status;
-
-	newstr_init( &page );
-
-	p = newstr_cpytodelim( &page, skip_ws( p ), "- \t\r\n", 0 );
-	if ( newstr_memerr( &page ) ) return BIBL_ERR_MEMERR;
-	if ( page.len>0 ) {
-		status = fields_add( info, "PAGESTART", page.data, level );
-		if ( status!=FIELDS_OK ) return BIBL_ERR_MEMERR;
-	}
-
-	while ( *p && (is_ws(*p) || *p=='-' ) ) p++;
-
-	p = newstr_cpytodelim( &page, p, "- \t\r\n", 0 );
-	if ( newstr_memerr( &page ) ) return BIBL_ERR_MEMERR;
-	if ( page.len>0 ) {
-		status = fields_add( info, "PAGEEND", page.data, level );
-		if ( status!=FIELDS_OK ) return BIBL_ERR_MEMERR;
-	}
-
-	newstr_free( &page );
-
-	return BIBL_OK;
-}
-
 /* month_convert()
  * convert month name to number in format MM, e.g. "January" -> "01"
  * if converted, return 1
@@ -403,28 +381,29 @@ month_convert( char *in, char *out )
 }
 
 static int
-endin_adddate( fields *info, char *tag, char *newtag, char *p, int level )
+endin_date( fields *bibin, newstr *intag, newstr *invalue, int level, param *pm, char *outtag, fields *bibout )
 {
 	char *tags[3][2] = {
-		{ "YEAR",  "PARTYEAR" },
-		{ "MONTH", "PARTMONTH" },
-		{ "DAY",   "PARTDAY" }
+		{ "DATE:YEAR",  "PARTDATE:YEAR" },
+		{ "DATE:MONTH", "PARTDATE:MONTH" },
+		{ "DATE:DAY",   "PARTDATE:DAY" }
 	};
+	char *p = invalue->data;
 	char month[10], *m;
 	int part, status;
 	newstr date;
 
 	newstr_init( &date );
 
-	if ( !strncasecmp( newtag, "PART", 4 ) ) part = 1;
+	if ( !strncasecmp( outtag, "PART", 4 ) ) part = 1;
 	else part = 0;
 
 	/* %D YEAR */
-	if ( !strcasecmp( tag, "%D" ) ) {
+	if ( !strcasecmp( intag->data, "%D" ) ) {
 		newstr_cpytodelim( &date, skip_ws( p ), "", 0 );
 		if ( newstr_memerr( &date ) ) return BIBL_ERR_MEMERR;
 		if ( date.len>0 ) {
-			status = fields_add( info, tags[0][part], date.data, level );
+			status = fields_add( bibout, tags[0][part], date.data, level );
 			if ( status!=FIELDS_OK ) return BIBL_ERR_MEMERR;
 		}
 	}
@@ -432,7 +411,7 @@ endin_adddate( fields *info, char *tag, char *newtag, char *p, int level )
 	/* %8 MONTH DAY, YEAR */
 	/* %8 MONTH, YEAR */
 	/* %8 MONTH YEAR */
-	else if ( !strcasecmp( tag, "%8" ) ) {
+	else if ( !strcasecmp( intag->data, "%8" ) ) {
 
 		/* ...get month */
 		p = newstr_cpytodelim( &date, skip_ws( p ), " ,\n", 0 );
@@ -440,7 +419,7 @@ endin_adddate( fields *info, char *tag, char *newtag, char *p, int level )
 		if ( date.len>0 ) {
 			if ( month_convert( date.data, month ) ) m = month;
 			else m = date.data;
-			status = fields_add( info, tags[1][part], m, level );
+			status = fields_add( bibout, tags[1][part], m, level );
 			if ( status!=FIELDS_OK ) return BIBL_ERR_MEMERR;
 		}
 
@@ -451,10 +430,10 @@ endin_adddate( fields *info, char *tag, char *newtag, char *p, int level )
 		p = newstr_cpytodelim( &date, skip_ws( p ), ",\n", 0 );
 		if ( newstr_memerr( &date ) ) return BIBL_ERR_MEMERR;
 		if ( date.len>0 && date.len<3 ) {
-			status = fields_add( info, tags[2][part], date.data, level );
+			status = fields_add( bibout, tags[2][part], date.data, level );
 			if ( status!=FIELDS_OK ) return BIBL_ERR_MEMERR;
 		} else if ( date.len==4 ) {
-			status = fields_add( info, tags[0][part], date.data, level );
+			status = fields_add( bibout, tags[0][part], date.data, level );
 			if ( status!=FIELDS_OK ) return BIBL_ERR_MEMERR;
 		}
 
@@ -465,7 +444,7 @@ endin_adddate( fields *info, char *tag, char *newtag, char *p, int level )
 		p = newstr_cpytodelim( &date, skip_ws( p ), " \t\n\r", 0 );
 		if ( newstr_memerr( &date ) ) return BIBL_ERR_MEMERR;
 		if ( date.len > 0 ) {
-			status = fields_add( info, tags[0][part], date.data, level );
+			status = fields_add( bibout, tags[0][part], date.data, level );
 			if ( status!=FIELDS_OK ) return BIBL_ERR_MEMERR;
 		}
 	}
@@ -474,7 +453,7 @@ endin_adddate( fields *info, char *tag, char *newtag, char *p, int level )
 }
 
 static int
-endin_addtype( fields *info, char *data, int level )
+endin_type( fields *bibin, newstr *intag, newstr *invalue, int level, param *pm, char *outtag, fields *bibout )
 {
 	lookups types[] = {
 		{ "GENERIC",                "ARTICLE" },
@@ -506,17 +485,16 @@ endin_addtype( fields *info, char *data, int level )
 	int  ntypes = sizeof( types ) / sizeof( lookups );
 	int  i, status, found=0;
 	for ( i=0; i<ntypes; ++i ) {
-		if ( !strcasecmp( types[i].oldstr, data ) ) {
+		if ( !strcasecmp( types[i].oldstr, invalue->data ) ) {
 			found = 1;
-			status = fields_add( info, "INTERNAL_TYPE", types[i].newstr, level );
+			status = fields_add( bibout, "INTERNAL_TYPE", types[i].newstr, level );
 			if ( status!=FIELDS_OK ) return BIBL_ERR_MEMERR;
 		}
 	}
 	if ( !found ) {
-		fprintf( stderr, "Did not identify reference type '%s'\n",
-			data );
+		fprintf( stderr, "Did not identify reference type '%s'\n", invalue->data );
 		fprintf( stderr, "Defaulting to journal article type\n");
-		status = fields_add( info, "INTERNAL_TYPE", types[0].newstr, level );
+		status = fields_add( bibout, "INTERNAL_TYPE", types[0].newstr, level );
 		if ( status!=FIELDS_OK ) return BIBL_ERR_MEMERR;
 	}
 	return BIBL_OK;
@@ -531,110 +509,56 @@ endin_notag( param *p, char *tag, char *data )
 	}
 }
 
-/* Wiley's EndNote download has DOI's in "%1" tag */
-static int
-endin_addnotes( fields *info, char *tag, char *value, int level )
-{
-	int fstatus, doi;
-	doi = is_doi( value );
-	if ( doi!=-1 )
-		fstatus = fields_add( info, "DOI", &(value[doi]), level );
-	else
-		fstatus = fields_add( info, tag, value, level );
-	if ( fstatus==FIELDS_OK ) return BIBL_OK;
-	else return BIBL_ERR_MEMERR;
-}
-
-static int
-endin_simple( fields *info, char *tag, char *value, int level )
-{
-	int fstatus = fields_add( info, tag, value, level );
-	if ( fstatus==FIELDS_OK ) return BIBL_OK;
-	else return BIBL_ERR_MEMERR;
-}
-
 int
-endin_convertf( fields *endin, fields *info, int reftype, param *p, variants *all, int nall )
+endin_convertf( fields *bibin, fields *bibout, int reftype, param *p )
 {
-	int i, level, n, process, nfields, ok, fstatus, status = BIBL_OK;
-	char *newtag, *t;
-	newstr *d;
+	static int (*convertfns[NUM_REFTYPES])(fields *, newstr *, newstr *, int, param *, char *, fields *) = {
+		[ 0 ... NUM_REFTYPES-1 ] = generic_null,
+		[ SIMPLE       ] = generic_simple,
+		[ TITLE        ] = generic_title,
+		[ PERSON       ] = generic_person,
+		[ SERIALNO     ] = generic_serialno,
+		[ PAGES        ] = generic_pages,
+		[ NOTES        ] = generic_notes,
+		[ TYPE         ] = endin_type,
+		[ DATE         ] = endin_date,
+        };
 
-	nfields = fields_num( endin );
+	int i, level, process, nfields, fstatus, status = BIBL_OK;
+	char *outtag;
+	newstr *intag, *invalue;
+
+	nfields = fields_num( bibin );
 	for ( i=0; i<nfields; ++i ) {
-		/* Ensure that data exists */
-		d = fields_value( endin, i, FIELDS_STRP_NOUSE );
-		if ( d->len == 0 ) {
-			fields_setused( endin, i );
+
+		/* Ensure we have data */
+		if ( fields_nodata( bibin, i ) ) {
+			fields_setused( bibin, i );
 			continue;
 		}
+
+		intag = fields_tag( bibin, i, FIELDS_STRP );
+		invalue = fields_value( bibin, i, FIELDS_STRP );
+
 		/*
-		 * All refer format tags start with '%'.  If we have one
+		 * Refer format tags start with '%'.  If we have one
 		 * that doesn't, assume that it comes from endx2xml
 		 * and just copy and paste to output
 		 */
-		t = fields_tag( endin, i, FIELDS_CHRP );
-		if ( t[0]!='%' ) {
-			fstatus = fields_add( info, t, d->data, endin->level[i] );
+		if ( intag->len && intag->data[0]!='%' ) {
+			fstatus = fields_add( bibout, intag->data, invalue->data, bibin->level[i] );
 			if ( fstatus!=FIELDS_OK ) return BIBL_ERR_MEMERR;
 			continue;
 		}
 
-		n = translate_oldtag( t, reftype, all, nall, &process, &level, &newtag );
-		if ( n==-1 ) {
-			endin_notag( p, t, d->data );
+		if ( !translate_oldtag( intag->data, reftype, p->all, p->nall, &process, &level, &outtag ) ) {
+			endin_notag( p, intag->data, invalue->data );
 			continue;
 		}
-		if ( process == ALWAYS ) continue; /* add these later */
 
-		fields_setused( endin, i );
+		fields_setused( bibin, i );
 
-		switch ( process ) {
-
-		case SIMPLE:
-			status = endin_simple( info, newtag, d->data, level );
-			break;
-
-		case TYPE:
-			status = endin_addtype( info, d->data, level );
-			break;
-
-		case TITLE:
-			ok = title_process( info, newtag, d->data, level, p->nosplittitle );
-			if ( !ok ) status = BIBL_ERR_MEMERR;
-			else status = BIBL_OK;
-			break;
-
-		case PERSON:
-			ok = name_add( info, newtag, d->data, level, &(p->asis), &(p->corps) );
-			if ( !ok ) status = BIBL_ERR_MEMERR;
-			else status = BIBL_OK;
-			break;
-
-		case DATE:
-			status = endin_adddate( info, t, newtag,d->data,level);
-			break;
-
-		case PAGES:
-			status = endin_addpage( info, d->data, level );
-			break;
-
-		case SERIALNO:
-			ok = addsn( info, d->data, level );
-			if ( !ok ) status = BIBL_ERR_MEMERR;
-			else status = BIBL_OK;
-			break;
-
-		case NOTES:
-			status = endin_addnotes( info, newtag, d->data, level );
-			break;
-
-		default:
-			fprintf(stderr,"%s: internal error -- illegal process number %d\n", p->progname, process );
-			status = BIBL_OK;
-			break;
-		}
-
+		status = convertfns[ process ]( bibin, intag, invalue, level, p, outtag, bibout );
 		if ( status!=BIBL_OK ) return status;
 
 	}

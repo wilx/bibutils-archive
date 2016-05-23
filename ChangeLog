@@ -1,6 +1,27 @@
 
 BIBUTILS
 
+58
+5/23/16
+
+INTERNAL
++ Change xxx_convertf() functions to use tables of function pointers
++ Use generic function pointers whenever possible to decrease duplicated code
+
+ADSOUT
++ Improve URL handling
+
+BIBLATEXIN
++ Identify JSTOR
+
+BIBTEXOUT
++ Handle PMC identifiers
++ Fix chapter/title for @inbook references (reported by Vivek Botcha)
+
+RISOUT
++ Handle PMC identifiers
+
+
 5.7
 2/15/16
 

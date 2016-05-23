@@ -14,7 +14,11 @@
 #include "fields.h"
 #include "xml.h"
 #include "xml_encoding.h"
-#include "ebiin.h"
+#include "bibformats.h"
+
+static int ebiin_readf( FILE *fp, char *buf, int bufsize, int *bufpos, newstr *line, newstr *reference, int *fcharset );
+static int ebiin_processf( fields *ebiin, char *data, char *filename, long nref, param *p );
+
 
 /*****************************************************
  PUBLIC: void ebiin_initparams()
@@ -52,7 +56,7 @@ ebiin_initparams( param *p, const char *progname )
 /*****************************************************
  PUBLIC: int ebiin_readf()
 *****************************************************/
-int
+static int
 ebiin_readf( FILE *fp, char *buf, int bufsize, int *bufpos, newstr *line, newstr *reference, int *fcharset )
 {
 	newstr tmp;
@@ -154,7 +158,7 @@ ebiin_medlinedate_year( fields *info, char *p, newstr *s, int level, char **end 
 	*end = newstr_cpytodelim( s, p, " \t\n\r", 0 );
 	if ( newstr_memerr( s ) ) return BIBL_ERR_MEMERR;
 	if ( s->len ) {
-		status = fields_add( info, "PARTYEAR", s->data, level );
+		status = fields_add( info, "PARTDATE:YEAR", s->data, level );
 		if ( status!=FIELDS_OK ) return BIBL_ERR_MEMERR;
 	}
 	return BIBL_OK;
@@ -167,7 +171,7 @@ ebiin_medlinedate_month( fields *info, char *p, newstr *s, int level, char **end
 	newstr_findreplace( s, "-", "/" );
 	if ( newstr_memerr( s ) ) return BIBL_ERR_MEMERR;
 	if ( s->len ) {
-		status = fields_add( info, "PARTMONTH", s->data, level );
+		status = fields_add( info, "PARTDATE:MONTH", s->data, level );
 		if ( status!=FIELDS_OK ) return BIBL_ERR_MEMERR;
 	}
 	return BIBL_OK;
@@ -179,7 +183,7 @@ ebiin_medlinedate_day( fields *info, char *p, newstr *s, int level, char **end )
 	*end = newstr_cpytodelim( s, p, " \t\n\r", 0 );
 	if ( newstr_memerr( s ) ) return BIBL_ERR_MEMERR;
 	if ( s->len ) {
-		status = fields_add( info, "PARTDAY", s->data, level );
+		status = fields_add( info, "PARTDATE:DAY", s->data, level );
 		if ( status!=FIELDS_OK ) return BIBL_ERR_MEMERR;
 	}
 	return BIBL_OK;
@@ -231,13 +235,13 @@ static int
 ebiin_journal1( xml *node, fields *info )
 {
 	xml_convert c[] = {
-		{ "ISSN",     NULL, NULL, "ISSN",      1 },
-		{ "Volume",   NULL, NULL, "VOLUME",    1 },
-		{ "Issue",    NULL, NULL, "ISSUE",     1 },
-		{ "Year",     NULL, NULL, "PARTYEAR",  1 },
-		{ "Month",    NULL, NULL, "PARTMONTH", 1 },
-		{ "Day",      NULL, NULL, "PARTDAY",   1 },
-		{ "Language", NULL, NULL, "LANGUAGE",  1 },
+		{ "ISSN",     NULL, NULL, "ISSN",           1 },
+		{ "Volume",   NULL, NULL, "VOLUME",         1 },
+		{ "Issue",    NULL, NULL, "ISSUE",          1 },
+		{ "Year",     NULL, NULL, "PARTDATE:YEAR",  1 },
+		{ "Month",    NULL, NULL, "PARTDATE:MONTH", 1 },
+		{ "Day",      NULL, NULL, "PARTDATE:DAY",   1 },
+		{ "Language", NULL, NULL, "LANGUAGE",       1 },
 	};
 	int nc = sizeof( c ) / sizeof( c[0] ), status, found;
 	if ( xml_hasdata( node ) ) {
@@ -289,7 +293,7 @@ ebiin_pages( fields *info, char *p )
 	}
 
 	if ( sp.len ) {
-		status = fields_add( info, "PAGESTART", sp.data, level );
+		status = fields_add( info, "PAGES:START", sp.data, level );
 		if ( status!=FIELDS_OK ) {
 			ret = BIBL_ERR_MEMERR;
 			goto out;
@@ -301,7 +305,7 @@ ebiin_pages( fields *info, char *p )
 				sp.data[i] = ep.data[i-sp.len+ep.len];
 				up = &(sp);
 		} else up = &(ep);
-		status = fields_add( info, "PAGEEND", up->data, level );
+		status = fields_add( info, "PAGES:STOP", up->data, level );
 		if ( status!=FIELDS_OK ) ret = BIBL_ERR_MEMERR;
 	}
 
@@ -495,33 +499,33 @@ static int
 ebiin_book( xml *node, fields *info, int book_level )
 {
 	xml_convert book[] = {
-		{ "Publisher",              NULL, NULL, "PUBLISHER",  0 },
-		{ "Language",               NULL, NULL, "LANGUAGE",   0 },
-		{ "ISBN10",                 NULL, NULL, "ISBN",       0 },
-		{ "ISBN13",                 NULL, NULL, "ISBN13",     0 },
-		{ "Year",                   NULL, NULL, "YEAR",       0 },
-		{ "Month",                  NULL, NULL, "MONTH",      0 },
-		{ "Day",                    NULL, NULL, "DAY",        0 },
-		{ "PageTotal",              NULL, NULL, "TOTALPAGES", 0 },
-		{ "SeriesName",             NULL, NULL, "TITLE",      1 },
-		{ "SeriesISSN",             NULL, NULL, "ISSN",       0 },
-		{ "OtherReportInformation", NULL, NULL, "NOTES",      0 },
-		{ "Edition",                NULL, NULL, "EDITION",    0 },
+		{ "Publisher",              NULL, NULL, "PUBLISHER",      0 },
+		{ "Language",               NULL, NULL, "LANGUAGE",       0 },
+		{ "ISBN10",                 NULL, NULL, "ISBN",           0 },
+		{ "ISBN13",                 NULL, NULL, "ISBN13",         0 },
+		{ "Year",                   NULL, NULL, "DATE:YEAR",      0 },
+		{ "Month",                  NULL, NULL, "DATE:MONTH",     0 },
+		{ "Day",                    NULL, NULL, "DATE:DAY",       0 },
+		{ "PageTotal",              NULL, NULL, "PAGES:TOTAL",    0 },
+		{ "SeriesName",             NULL, NULL, "TITLE",          1 },
+		{ "SeriesISSN",             NULL, NULL, "ISSN",           0 },
+		{ "OtherReportInformation", NULL, NULL, "NOTES",          0 },
+		{ "Edition",                NULL, NULL, "EDITION",        0 },
 	};
 	int nbook = sizeof( book ) / sizeof( book[0] );
 	xml_convert inbook[] = {
-		{ "Publisher",              NULL, NULL, "PUBLISHER",  1 },
-		{ "Language",               NULL, NULL, "LANGUAGE",   0 },
-		{ "ISBN10",                 NULL, NULL, "ISBN",       1 },
-		{ "ISBN13",                 NULL, NULL, "ISBN13",     1 },
-		{ "Year",                   NULL, NULL, "PARTYEAR",   1 },
-		{ "Month",                  NULL, NULL, "PARTMONTH",  1 },
-		{ "Day",                    NULL, NULL, "PARTDAY",    1 },
-		{ "PageTotal",              NULL, NULL, "TOTALPAGES", 1 },
-		{ "SeriesName",             NULL, NULL, "TITLE",      2 },
-		{ "SeriesISSN",             NULL, NULL, "ISSN",       1 },
-		{ "OtherReportInformation", NULL, NULL, "NOTES",      1 },
-		{ "Edition",                NULL, NULL, "EDITION",    1 },
+		{ "Publisher",              NULL, NULL, "PUBLISHER",      1 },
+		{ "Language",               NULL, NULL, "LANGUAGE",       0 },
+		{ "ISBN10",                 NULL, NULL, "ISBN",           1 },
+		{ "ISBN13",                 NULL, NULL, "ISBN13",         1 },
+		{ "Year",                   NULL, NULL, "PARTDATE:YEAR",  1 },
+		{ "Month",                  NULL, NULL, "PARTDATE:MONTH", 1 },
+		{ "Day",                    NULL, NULL, "PARTDATE:DAY",   1 },
+		{ "PageTotal",              NULL, NULL, "PAGES:TOTAL",    1 },
+		{ "SeriesName",             NULL, NULL, "TITLE",          2 },
+		{ "SeriesISSN",             NULL, NULL, "ISSN",           1 },
+		{ "OtherReportInformation", NULL, NULL, "NOTES",          1 },
+		{ "Edition",                NULL, NULL, "EDITION",        1 },
 	};
 	int ninbook = sizeof( inbook ) / sizeof( inbook[0] );
 	xml_convert *c;
@@ -684,8 +688,8 @@ ebiin_assembleref( xml *node, fields *info )
 	return BIBL_OK;
 }
 
-int
-ebiin_processf( fields *ebiin, char *data, char *filename, long nref )
+static int
+ebiin_processf( fields *ebiin, char *data, char *filename, long nref, param *p )
 {
 	int status;
 	xml top;

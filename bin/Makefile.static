@@ -6,16 +6,16 @@ CFLAGS     = -I ../lib $(CFLAGSIN)
 
 TOMODS     = args.o bibprog.o tomods.o ../lib/modsout.o
 
-BIBTEXIN   = bib2xml.o ../lib/bibtexin.o ../lib/bibtextypes.o
-BIBLATEXIN = biblatex2xml.o ../lib/biblatexin.o ../lib/bltypes.o
-COPACIN    = copac2xml.o ../lib/copacin.o ../lib/copactypes.o
+BIBTEXIN   = bib2xml.o ../lib/bibtexin.o ../lib/bibtextypes.o ../lib/generic.o
+BIBLATEXIN = biblatex2xml.o ../lib/biblatexin.o ../lib/bltypes.o ../lib/generic.o
+COPACIN    = copac2xml.o ../lib/copacin.o ../lib/copactypes.o ../lib/generic.o
 EBIIN      = ebi2xml.o ../lib/ebiin.o
-ENDIN      = end2xml.o ../lib/endin.o ../lib/endtypes.o
-ENDXIN     = endx2xml.o ../lib/endxmlin.o ../lib/endin.o ../lib/endtypes.o
-ISIIN      = isi2xml.o ../lib/isiin.o ../lib/isitypes.o
+ENDIN      = end2xml.o ../lib/endin.o ../lib/endtypes.o ../lib/generic.o
+ENDXIN     = endx2xml.o ../lib/endxmlin.o ../lib/endin.o ../lib/endtypes.o ../lib/generic.o
+ISIIN      = isi2xml.o ../lib/isiin.o ../lib/isitypes.o ../lib/generic.o
 MEDIN      = med2xml.o ../lib/medin.o
 MODSCLEAN  = modsclean.o ../lib/modsin.o
-RISIN      = ris2xml.o ../lib/risin.o ../lib/ristypes.o
+RISIN      = ris2xml.o ../lib/risin.o ../lib/ristypes.o ../lib/generic.o
 WORDIN     = wordbib2xml.o ../lib/wordin.o
 
 FROMMODS   = bibprog.o args.o ../lib/modsin.o

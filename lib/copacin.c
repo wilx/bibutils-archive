@@ -14,15 +14,22 @@
 #include "newstr_conv.h"
 #include "list.h"
 #include "name.h"
-#include "title.h"
 #include "fields.h"
 #include "reftypes.h"
-#include "serialno.h"
-#include "copacin.h"
+#include "bibformats.h"
+#include "generic.h"
+
+extern variants copac_all[];
+extern int copac_nall;
 
 /*****************************************************
  PUBLIC: void copacin_initparams()
 *****************************************************/
+
+static int copacin_readf( FILE *fp, char *buf, int bufsize, int *bufpos, newstr *line, newstr *reference, int *fcharset );
+static int copacin_processf( fields *bibin, char *p, char *filename, long nref, param *pm );
+static int copacin_convertf( fields *bibin, fields *info, int reftype, param *pm );
+
 void
 copacin_initparams( param *p, const char *progname )
 {
@@ -80,7 +87,7 @@ readmore( FILE *fp, char *buf, int bufsize, int *bufpos, newstr *line )
 	else return newstr_fget( fp, buf, bufsize, bufpos, line );
 }
 
-int
+static int
 copacin_readf( FILE *fp, char *buf, int bufsize, int *bufpos, newstr *line, newstr *reference, int *fcharset )
 {
 	int haveref = 0, inref=0;
@@ -152,8 +159,8 @@ copacin_nextline( char *p )
 	return p;
 }
 
-int
-copacin_processf( fields *copacin, char *p, char *filename, long nref )
+static int
+copacin_processf( fields *copacin, char *p, char *filename, long nref, param *pm )
 {
 	newstr tag, data;
 	int status;
@@ -188,17 +195,16 @@ copacin_processf( fields *copacin, char *p, char *filename, long nref )
  * editors seem to be stuck in as authors with the tag "[Editor]" in it
  */
 static int
-copacin_addname( fields *info, char *tag, newstr *name, int level, list *asis,
-	list *corps )
+copacin_person( fields *bibin, newstr *intag, newstr *invalue, int level, param *pm, char *outtag, fields *bibout )
 {
-	char *usetag = tag, editor[]="EDITOR";
+	char *usetag = outtag, editor[]="EDITOR";
 	newstr usename, *s;
 	list tokens;
 	int comma = 0, i, ok;
 
-	if ( list_find( asis, name->data ) !=-1  ||
-	     list_find( corps, name->data ) !=-1 ) {
-		ok = name_add( info, tag, name->data, level, asis, corps );
+	if ( list_find( &(pm->asis), invalue->data ) !=-1  ||
+	     list_find( &(pm->corps), invalue->data ) !=-1 ) {
+		ok = name_add( bibout, outtag, invalue->data, level, &(pm->asis), &(pm->corps) );
 		if ( ok ) return BIBL_OK;
 		else return BIBL_ERR_MEMERR;
 	}
@@ -206,7 +212,7 @@ copacin_addname( fields *info, char *tag, newstr *name, int level, list *asis,
 	list_init( &tokens );
 	newstr_init( &usename );
 
-	list_tokenize( &tokens, name, " ", 1 );
+	list_tokenize( &tokens, invalue, " ", 1 );
 	for ( i=0; i<tokens.n; ++i ) {
 		s = list_get( &tokens, i );
 		if ( !strcmp( s->data, "[Editor]" ) ) {
@@ -223,13 +229,18 @@ copacin_addname( fields *info, char *tag, newstr *name, int level, list *asis,
 	}
 
 	for ( i=0; i<tokens.n; ++i ) {
+		s = list_get( &tokens, i );
+		if ( s->len==0 ) continue;
 		if ( i ) newstr_addchar( &usename, ' ' );
-		newstr_newstrcat( &usename, list_get( &tokens, i ) );
+		newstr_newstrcat( &usename, s );
 	}
 
 	list_free( &tokens );
 
-	ok = name_add( info, usetag, usename.data, level, asis, corps );
+	ok = name_add( bibout, usetag, usename.data, level, &(pm->asis), &(pm->corps) );
+
+	newstr_free( &usename );
+
 	if ( ok ) return BIBL_OK;
 	else return BIBL_ERR_MEMERR;
 }
@@ -244,66 +255,37 @@ copacin_report_notag( param *p, char *tag )
 }
 
 static int
-copacin_simple( fields *out, char *tag, char *value, int level )
+copacin_convertf( fields *bibin, fields *bibout, int reftype, param *p )
 {
-	int fstatus = fields_add( out, tag, value, level );
-	if ( fstatus==FIELDS_OK ) return BIBL_OK;
-	else return BIBL_ERR_MEMERR;
-}
+	static int (*convertfns[NUM_REFTYPES])(fields *, newstr *, newstr *, int, param *, char *, fields *) = {
+		[ 0 ... NUM_REFTYPES-1 ] = generic_null,
+		[ SIMPLE       ] = generic_simple,
+		[ TITLE        ] = generic_title,
+		[ NOTES        ] = generic_notes,
+		[ SERIALNO     ] = generic_serialno,
+		[ PERSON       ] = copacin_person
+	};
 
-int
-copacin_convertf( fields *copacin, fields *out, int reftype, param *p, variants *all, int nall )
-{
-	int  process, level, i, n, nfields, ok, status = BIBL_OK;
-	newstr *tag, *data;
-	char *newtag;
+	int  process, level, i, nfields, status = BIBL_OK;
+	newstr *intag, *invalue;
+	char *outtag;
 
-	nfields = fields_num( copacin );
+	nfields = fields_num( bibin );
 	for ( i=0; i<nfields; ++i ) {
 
-		tag = fields_tag( copacin, i, FIELDS_STRP );
+		intag = fields_tag( bibin, i, FIELDS_STRP );
 
-		n = translate_oldtag( tag->data, reftype, all, nall, &process, &level, &newtag );
-		if ( n==-1 ) {
-			copacin_report_notag( p, tag->data );
+		if ( !translate_oldtag( intag->data, reftype, p->all, p->nall, &process, &level, &outtag ) ) {
+			copacin_report_notag( p, intag->data );
 			continue;
 		}
-		if ( process == ALWAYS ) continue; /*add these later*/
 
-		data = fields_value( copacin, i, FIELDS_STRP );
+		invalue = fields_value( bibin, i, FIELDS_STRP );
 
-		switch ( process ) {
-
-		case SIMPLE:
-			status = copacin_simple( out, newtag, data->data, level );
-			break;
-
-		case TITLE:
-			ok = title_process( out, newtag, data->data, level, p->nosplittitle );
-			if ( ok ) status = BIBL_OK;
-			else status = BIBL_ERR_MEMERR;
-			break;
-
-		case PERSON:
-			status = copacin_addname( out, newtag, data, level, &(p->asis), &(p->corps) );
-			break;
-
-		case SERIALNO:
-			ok = addsn( out, data->data, level );
-			if ( ok ) status = BIBL_OK;
-			else status = BIBL_ERR_MEMERR;
-			break;
-
-		default:
-			fprintf(stderr,"%s: internal error -- " "illegal process value %d\n", p->progname, process );
-			status = BIBL_OK;
-			break;
-		}
-
+		status = convertfns[ process ] ( bibin, intag, invalue, level, p, outtag, bibout );
 		if ( status!=BIBL_OK ) return status;
 
 	}
 
 	return status;
 }
-

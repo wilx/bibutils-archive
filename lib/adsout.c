@@ -17,7 +17,11 @@
 #include "strsearch.h"
 #include "fields.h"
 #include "name.h"
-#include "adsout.h"
+#include "bibformats.h"
+
+static void adsout_write( fields *info, FILE *fp, param *p, unsigned long refnum );
+static void adsout_writeheader( FILE *outptr, param *p );
+
 
 void
 adsout_initparams( param *p, const char *progname )
@@ -175,8 +179,8 @@ output_title( FILE *fp, fields *f, char *full, char *sub, char *adstag, int leve
 			"NUMBER", NULL );
 		if ( iss && iss->len ) fprintf( fp, ", no. %s", iss->data );
 
-		sn = fields_findv( f, LEVEL_ANY, FIELDS_STRP, "PAGESTART" );
-		en = fields_findv( f, LEVEL_ANY, FIELDS_STRP, "PAGEEND" );
+		sn = fields_findv( f, LEVEL_ANY, FIELDS_STRP, "PAGES:START" );
+		en = fields_findv( f, LEVEL_ANY, FIELDS_STRP, "PAGES:STOP" );
 		ar = fields_findv( f, LEVEL_ANY, FIELDS_STRP, "ARTICLENUMBER" );
 		if ( sn && sn->len ) {
 			if ( en && en->len )
@@ -221,8 +225,8 @@ output_people( FILE *fp, fields *f, char *tag1, char *tag2, char *tag3, char *ad
 static void
 output_pages( FILE *fp, fields *f )
 {
-	newstr *sn = fields_findv( f, LEVEL_ANY, FIELDS_STRP, "PAGESTART" );
-	newstr *en = fields_findv( f, LEVEL_ANY, FIELDS_STRP, "PAGEEND" );
+	newstr *sn = fields_findv( f, LEVEL_ANY, FIELDS_STRP, "PAGES:START" );
+	newstr *en = fields_findv( f, LEVEL_ANY, FIELDS_STRP, "PAGES:STOP" );
 	newstr *ar = fields_findv( f, LEVEL_ANY, FIELDS_STRP, "ARTICLENUMBER" );
 	if ( sn && sn->len!=0 ) fprintf( fp, "%%P %s\n", sn->data );
 	else if ( ar && ar->len!=0 ) fprintf( fp, "%%P %s\n", ar->data );
@@ -248,7 +252,7 @@ static int
 get_month( fields *f, int level )
 {
 	newstr *month = fields_findv_firstof( f, level, FIELDS_STRP,
-			"MONTH", "PARTMONTH", NULL );
+			"DATE:MONTH", "PARTDATE:MONTH", NULL );
 	if ( month && month->len ) return mont2mont( month->data );
 	else return 0;
 }
@@ -257,7 +261,7 @@ static void
 output_date( FILE *fp, fields *f, char *adstag, int level )
 {
 	newstr *year = fields_findv_firstof( f, level, FIELDS_STRP,
-		"YEAR", "PARTYEAR", NULL );
+		"DATE:YEAR", "PARTDATE:YEAR", NULL );
 	int month;
 	if ( year && year->len ) {
 		month = get_month( f, level );
@@ -325,8 +329,8 @@ output_Rtag( FILE *fp, fields *f, char *adstag, int type )
 	strcpy( out, "..................." );
 
 	/** YYYY */
-	n = fields_find( f, "YEAR", LEVEL_ANY );
-	if ( n==-1 ) n = fields_find( f, "PARTYEAR", LEVEL_ANY );
+	n = fields_find( f, "DATE:YEAR", LEVEL_ANY );
+	if ( n==-1 ) n = fields_find( f, "PARTDATE:YEAR", LEVEL_ANY );
 	if ( n!=-1 ) output_4digit_value( out, atoi( fields_value( f, n, FIELDS_CHRP ) ) );
 
 	/** JJJJ */
@@ -344,7 +348,7 @@ output_Rtag( FILE *fp, fields *f, char *adstag, int type )
 	if ( n!=-1 ) output_4digit_value( out+9, atoi( fields_value( f, n, FIELDS_CHRP ) ) );
 
 	/** MPPPP */
-	n = fields_find( f, "PAGESTART", LEVEL_ANY );
+	n = fields_find( f, "PAGES:START", LEVEL_ANY );
 	if ( n==-1 ) n = fields_find( f, "ARTICLENUMBER", LEVEL_ANY );
 	if ( n!=-1 ) {
 		page = atoll( fields_value( f, n, FIELDS_CHRP ) );
@@ -363,14 +367,14 @@ output_Rtag( FILE *fp, fields *f, char *adstag, int type )
 }
 
 static void
-output_easyall( FILE *fp, fields *f, char *tag, char *adstag, int level )
+output_easyall( FILE *fp, fields *f, char *tag, char *adstag, char *prefix, int level )
 {
 	vplist a;
 	int i;
 	vplist_init( &a );
 	fields_findv_each( f, level, FIELDS_CHRP, &a, tag );
 	for ( i=0; i<a.n; ++i )
-		fprintf( fp, "%s %s\n", adstag, (char *) vplist_get( &a, i ) );
+		fprintf( fp, "%s %s%s\n", adstag, prefix, (char *) vplist_get( &a, i ) );
 	vplist_free( &a );
 }
 
@@ -397,7 +401,7 @@ output_keys( FILE *fp, fields *f, char *tag, char *adstag, int level )
 	vplist_free( &a );
 }
 
-void
+static void
 adsout_write( fields *f, FILE *fp, param *p, unsigned long refnum )
 {
 	int type, status;
@@ -419,21 +423,25 @@ adsout_write( fields *f, FILE *fp, param *p, unsigned long refnum )
 	output_easy(    fp, f, "ISSUE",      "%N", LEVEL_ANY );
 	output_easy(    fp, f, "NUMBER",     "%N", LEVEL_ANY );
 	output_easy(    fp, f, "LANGUAGE",   "%M", LEVEL_ANY );
-	output_easyall( fp, f, "NOTES",      "%X", LEVEL_ANY );
+	output_easyall( fp, f, "NOTES",      "%X", "", LEVEL_ANY );
 	output_easy(    fp, f, "ABSTRACT",   "%B", LEVEL_ANY );
 	output_keys(    fp, f, "KEYWORD",    "%K", LEVEL_ANY );
-	output_easyall( fp, f, "URL",        "%U", LEVEL_ANY ); 
-	output_easyall( fp, f, "FILEATTACH", "%U", LEVEL_ANY ); 
-	output_easyall( fp, f, "FIGATTACH",  "%U", LEVEL_ANY ); 
+	output_easyall( fp, f, "URL",        "%U", "", LEVEL_ANY );
+	output_easyall( fp, f, "ARXIV",      "%U", "http://arxiv.org/abs/", LEVEL_ANY );
+	output_easyall( fp, f, "JSTOR",      "%U", "http://www.jstor.org/stable/", LEVEL_ANY );
+	output_easyall( fp, f, "PMID",       "%U", "http://www.ncbi.nlm.nih.gov/pubmed/", LEVEL_ANY );
+	output_easyall( fp, f, "PMC",        "%U", "http://www.ncbi.nlm.nih.gov/pmc/articles/", LEVEL_ANY );
+	output_easyall( fp, f, "FILEATTACH", "%U", "", LEVEL_ANY );
+	output_easyall( fp, f, "FIGATTACH",  "%U", "", LEVEL_ANY );
 	output_pages( fp, f );
-	output_easyall( fp, f, "DOI",        "%Y", LEVEL_ANY );
+	output_easyall( fp, f, "DOI",        "%Y", "", LEVEL_ANY );
         fprintf( fp, "%%W PHY\n%%G AUTHOR\n" );
 	output_Rtag( fp, f, "%R", type );
 	fprintf( fp, "\n" );
 	fflush( fp );
 }
 
-void
+static void
 adsout_writeheader( FILE *outptr, param *p )
 {
 	if ( p->utf8bom ) utf8_writebom( outptr );

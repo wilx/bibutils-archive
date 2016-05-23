@@ -15,13 +15,22 @@
 #include "xml.h"
 #include "xml_encoding.h"
 #include "reftypes.h"
-#include "endxmlin.h"
-#include "endin.h"
+#include "bibformats.h"
 
 typedef struct {
 	char *attrib;
 	char *internal;
 } attribs;
+
+extern variants end_all[];
+extern int end_nall;
+
+static int endxmlin_readf( FILE *fp, char *buf, int bufsize, int *bufpos, newstr *line, newstr *reference, int *fcharset );
+static int endxmlin_processf( fields *endin, char *p, char *filename, long nref, param *pm );
+extern int endin_typef( fields *endin, char *filename, int nrefs, param *p );
+extern int endin_convertf( fields *endin, fields *info, int reftype, param *p );
+extern int endin_cleanf( bibl *bin, param *p );
+
 
 /*****************************************************
  PUBLIC: void endxmlin_initparams()
@@ -66,7 +75,7 @@ xml_readmore( FILE *fp, char *buf, int bufsize, int *bufpos )
 	return 1;
 }
 
-int
+static int
 endxmlin_readf( FILE *fp, char *buf, int bufsize, int *bufpos, newstr *line,
 	newstr *reference, int *fcharset )
 {
@@ -541,8 +550,8 @@ endxmlin_assembleref( xml *node, fields *info )
  * this is necessary as the xml format is as nasty and as overloaded
  * as the tags used in the Refer format output
  */
-int
-endxmlin_processf( fields *fin, char *data, char *filename, long nref )
+static int
+endxmlin_processf( fields *fin, char *data, char *filename, long nref, param *pm )
 {
 	int status;
 	xml top;

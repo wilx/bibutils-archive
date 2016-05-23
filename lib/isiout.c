@@ -15,7 +15,10 @@
 #include "strsearch.h"
 #include "fields.h"
 #include "bibutils.h"
-#include "isiout.h"
+#include "bibformats.h"
+
+static void isiout_write( fields *info, FILE *fp, param *p, unsigned long refnum );
+static void isiout_writeheader( FILE *outptr, param *p );
 
 void
 isiout_initparams( param *p, const char *progname )
@@ -208,9 +211,9 @@ static void
 output_date( FILE *fp, fields *f )
 {
 	char *month = fields_findv_firstof( f, LEVEL_ANY, FIELDS_CHRP,
-		"PARTMONTH", "MONTH", NULL );
+		"PARTDATE:MONTH", "DATE:MONTH", NULL );
 	char *year  = fields_findv_firstof( f, LEVEL_ANY, FIELDS_CHRP,
-		"PARTYEAR", "YEAR", NULL );
+		"PARTDATE:YEAR", "DATE:YEAR", NULL );
 	if ( month ) fprintf( fp, "PD %s\n", month );
 	if ( year )  fprintf( fp, "PY %s\n", year );
 }
@@ -231,7 +234,7 @@ output_verbose( fields *f, unsigned long refnum )
 	}
 }
 
-void
+static void
 isiout_write( fields *f, FILE *fp, param *p, unsigned long refnum )
 {
         int type = get_type( f );
@@ -252,7 +255,6 @@ isiout_write( fields *f, FILE *fp, param *p, unsigned long refnum )
         output_people( fp, f, "EDITOR", "ED", -1 );
 	output_people( fp, f, "EDITOR:CORP", "ED", -1 );
         output_people( fp, f, "EDITOR:ASIS", "ED", -1 );*/
-/*        output_date( fp, f, refnum );*/
 
         output_title( fp, f, "TI", 0 );
         if ( type==TYPE_ARTICLE ) {
@@ -267,28 +269,25 @@ isiout_write( fields *f, FILE *fp, param *p, unsigned long refnum )
 	}
 
 	output_date( fp, f );
-/*	output_easy( fp, f, "PARTMONTH", "PD", -1 );
-	output_easy( fp, f, "PARTYEAR", "PY", -1 );*/
 
-	output_easy( fp, f, "PAGESTART", "BP", -1 );
-	output_easy( fp, f, "PAGEEND",   "EP", -1 );
+	output_easy( fp, f, "PAGES:START",   "BP", -1 );
+	output_easy( fp, f, "PAGES:STOP",    "EP", -1 );
         output_easy( fp, f, "ARTICLENUMBER", "AR", -1 );
-        /* output article number as pages */
-	output_easy( fp, f, "TOTALPAGES","PG", -1 );
+	output_easy( fp, f, "PAGES:TOTAL",   "PG", -1 );
 
-        output_easy( fp, f, "VOLUME",    "VL", -1 );
-        output_easy( fp, f, "ISSUE",     "IS", -1 );
-        output_easy( fp, f, "NUMBER",    "IS", -1 );
-	output_easy( fp, f, "DOI",       "DI", -1 );
-	output_easy( fp, f, "ISIREFNUM", "UT", -1 );
-	output_easy( fp, f, "LANGUAGE",  "LA", -1 );
-	output_easy( fp, f, "ISIDELIVERNUM", "GA", -1 );
+        output_easy( fp, f, "VOLUME",         "VL", -1 );
+        output_easy( fp, f, "ISSUE",          "IS", -1 );
+        output_easy( fp, f, "NUMBER",         "IS", -1 );
+	output_easy( fp, f, "DOI",            "DI", -1 );
+	output_easy( fp, f, "ISIREFNUM",      "UT", -1 );
+	output_easy( fp, f, "LANGUAGE",       "LA", -1 );
+	output_easy( fp, f, "ISIDELIVERNUM",  "GA", -1 );
 	output_keywords( fp, f );
-	output_easy( fp, f, "ABSTRACT",  "AB", -1 );
-	output_easy( fp, f, "TIMESCITED", "TC", -1 );
-	output_easy( fp, f, "NUMBERREFS", "NR", -1 );
-	output_easy( fp, f, "CITEDREFS",  "CR", -1 );
-	output_easy( fp, f, "ADDRESS",    "PI", -1 );
+	output_easy( fp, f, "ABSTRACT",       "AB", -1 );
+	output_easy( fp, f, "TIMESCITED",     "TC", -1 );
+	output_easy( fp, f, "NUMBERREFS",     "NR", -1 );
+	output_easy( fp, f, "CITEDREFS",      "CR", -1 );
+	output_easy( fp, f, "ADDRESS",        "PI", -1 );
 
 /*        output_easy( fp, f, "PUBLISHER", "PB", -1 );
         output_easy( fp, f, "DEGREEGRANTOR", "PB", -1 );
@@ -305,7 +304,7 @@ isiout_write( fields *f, FILE *fp, param *p, unsigned long refnum )
         fflush( fp );
 }
 
-void
+static void
 isiout_writeheader( FILE *outptr, param *p )
 {
 	if ( p->utf8bom ) utf8_writebom( outptr );

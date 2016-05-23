@@ -468,7 +468,7 @@ read_ref( FILE *fp, bibl *bin, char *filename, param *p )
 			bibl_free( bin );
 			goto out;
 		}
-		if ( p->processf( ref, reference.data, filename, nrefs+1 )){
+		if ( p->processf( ref, reference.data, filename, nrefs+1, p )){
 			ok = bibl_addref( bin, ref );
 			if ( !ok ) {
 				ret = BIBL_ERR_MEMERR;
@@ -570,10 +570,10 @@ build_refnum( fields *f, long nrefs, int *n )
 
 	newstr_init( &refnum );
 
-	year = fields_findv( f, LEVEL_MAIN, FIELDS_CHRP_NOUSE, "YEAR" );
+	year = fields_findv( f, LEVEL_MAIN, FIELDS_CHRP_NOUSE, "DATE:YEAR" );
 	if ( !year )
 		year = fields_findv_firstof( f, LEVEL_ANY, FIELDS_CHRP_NOUSE,
-			"YEAR", "PARTYEAR", NULL );
+			"DATE:YEAR", "PARTDATE:YEAR", NULL );
 
 	author = fields_findv( f, LEVEL_MAIN, FIELDS_CHRP_NOUSE, "AUTHOR" );
 	if ( !author )
@@ -643,10 +643,10 @@ generate_citekey( fields *f, int nref )
 
 	n1 = fields_find( f, "AUTHOR", 0 );
 	if ( n1==-1 ) n1 = fields_find( f, "AUTHOR", -1 );
-	n2 = fields_find( f, "YEAR", 0 );
-	if ( n2==-1 ) n2 = fields_find( f, "YEAR", -1 );
-	if ( n2==-1 ) n2 = fields_find( f, "PARTYEAR", 0 );
-	if ( n2==-1 ) n2 = fields_find( f, "PARTYEAR", -1 );
+	n2 = fields_find( f, "DATE:YEAR", 0 );
+	if ( n2==-1 ) n2 = fields_find( f, "DATE:YEAR", -1 );
+	if ( n2==-1 ) n2 = fields_find( f, "PARTDATE:YEAR", 0 );
+	if ( n2==-1 ) n2 = fields_find( f, "PARTDATE:YEAR", -1 );
 	if ( n1!=-1 && n2!=-1 ) {
 		p = f->data[n1].data;
 		while ( p && *p && *p!='|' ) {
@@ -803,8 +803,8 @@ convert_ref( bibl *bin, char *fname, bibl *bout, param *p )
 		rout = fields_new();
 		if ( !rout ) return BIBL_ERR_MEMERR;
 		if ( p->typef ) 
-			reftype = p->typef( rin, fname, i+1, p, p->all, p->nall );
-		status = p->convertf( rin, rout, reftype, p, p->all, p->nall );
+			reftype = p->typef( rin, fname, i+1, p );
+		status = p->convertf( rin, rout, reftype, p );
 		if ( status!=BIBL_OK ) return status;
 		if ( p->all ) {
 			status = process_alwaysadd( rout, reftype, p );

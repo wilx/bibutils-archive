@@ -9,26 +9,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "bibutils.h"
-
-/* bibl format includes */
-#include "adsout.h"
-#include "biblatexin.h"
-#include "bibtexin.h"
-#include "bibtexout.h"
-#include "copacin.h"
-#include "ebiin.h"
-#include "endin.h"
-#include "endxmlin.h"
-#include "endout.h"
-#include "isiin.h"
-#include "isiout.h"
-#include "medin.h"
-#include "modsin.h"
-#include "modsout.h"
-#include "risin.h"
-#include "risout.h"
-#include "wordin.h"
-#include "wordout.h"
+#include "bibformats.h"
 
 void
 bibl_initparams( param *p, int readmode, int writemode, char *progname )

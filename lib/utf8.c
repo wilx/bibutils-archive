@@ -7,6 +7,7 @@
  *
  */
 #include <stdio.h>
+#include <string.h>
 #include "utf8.h"
 
 /* UTF-8 encoding
@@ -146,5 +147,29 @@ utf8_writebom( FILE *outptr )
 	nc = utf8_encode( 0xFEFF, code );
 	for ( i=0; i<nc; ++i )
 		fprintf(outptr,"%c",code[i]);
+}
+
+/* utf8_is_emdash()
+ *
+ *emdash = 0xE2 (-30) 0x80 (-128) 0x94 (-108)
+ */
+int
+utf8_is_emdash( char *p )
+{
+	const char emdash[3] = { -30, -128, -108 };
+	if ( strncmp( p, emdash, 3 ) ) return 0;
+	return 1;
+}
+
+/* utf8_is_endash()
+ *
+ * endash = 0xE2 (-30) 0x80 (-128) 0x93 (-109)
+ */
+int
+utf8_is_endash( char *p )
+{
+	const char endash[3] = { -30, -128, -109 };
+	if ( strncmp( p, endash, 3 ) ) return 0;
+	return 1;
 }
 

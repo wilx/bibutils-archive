@@ -17,9 +17,13 @@
 #include "fields.h"
 #include "iso639_2.h"
 #include "utf8.h"
-#include "modsout.h"
 #include "modstypes.h"
 #include "marc.h"
+#include "bibformats.h"
+
+static void modsout_writeheader( FILE *outptr, param *p );
+static void modsout_writefooter( FILE *outptr );
+static void modsout_write( fields *info, FILE *outptr, param *p, unsigned long numrefs );
 
 void
 modsout_initparams( param *p, const char *progname )
@@ -348,9 +352,9 @@ output_names( fields *f, FILE *outptr, int level )
 
 /* datepos[ NUM_DATE_TYPES ]
  *     use define to ensure that the array and loops don't get out of sync
- *     datepos[0] -> YEAR/PARTYEAR
- *     datepos[1] -> MONTH/PARTMONTH
- *     datepos[2] -> DAY/PARTDAY
+ *     datepos[0] -> DATE:YEAR/PARTDATE:YEAR
+ *     datepos[1] -> DATE:MONTH/PARTDATE:MONTH
+ *     datepos[2] -> DATE:DAY/PARTDATE:DAY
  *     datepos[3] -> DATE/PARTDATE
  */
 #define DATE_YEAR      (0)
@@ -362,8 +366,8 @@ output_names( fields *f, FILE *outptr, int level )
 static int
 find_datepos( fields *f, int level, unsigned char use_altnames, int datepos[NUM_DATE_TYPES] )
 {
-	char      *src_names[] = { "YEAR", "MONTH", "DAY", "DATE" };
-	char      *alt_names[] = { "PARTYEAR", "PARTMONTH", "PARTDAY", "PARTDATE" };
+	char      *src_names[] = { "DATE:YEAR", "DATE:MONTH", "DATE:DAY", "DATE" };
+	char      *alt_names[] = { "PARTDATE:YEAR", "PARTDATE:MONTH", "PARTDATE:DAY", "PARTDATE" };
 	int       found = 0;
 	int       i;
 
@@ -624,9 +628,9 @@ static int
 output_partdate( fields *f, FILE *outptr, int level, int wrote_header )
 {
 	convert parts[] = {
-		{ "",	"PARTYEAR",                0, 0 },
-		{ "",	"PARTMONTH",               0, 0 },
-		{ "",	"PARTDAY",                 0, 0 },
+		{ "",	"PARTDATE:YEAR",           0, 0 },
+		{ "",	"PARTDATE:MONTH",          0, 0 },
+		{ "",	"PARTDATE:DAY",            0, 0 },
 	};
 	int nparts = sizeof(parts)/sizeof(parts[0]);
 
@@ -659,10 +663,10 @@ static int
 output_partpages( fields *f, FILE *outptr, int level, int wrote_header )
 {
 	convert parts[] = {
-		{ "",  "PAGESTART",                0, 0 },
-		{ "",  "PAGEEND",                  0, 0 },
+		{ "",  "PAGES:START",              0, 0 },
+		{ "",  "PAGES:STOP",               0, 0 },
 		{ "",  "PAGES",                    0, 0 },
-		{ "",  "TOTALPAGES",               0, 0 }
+		{ "",  "PAGES:TOTAL",              0, 0 }
 	};
 	int nparts = sizeof(parts)/sizeof(parts[0]);
 
@@ -670,7 +674,7 @@ output_partpages( fields *f, FILE *outptr, int level, int wrote_header )
 
 	try_output_partheader( outptr, wrote_header, level );
 
-	/* If PAGESTART or PAGEEND are undefined */
+	/* If PAGES:START or PAGES:STOP are undefined */
 	if ( parts[0].pos==-1 || parts[1].pos==-1 ) {
 		if ( parts[0].pos!=-1 )
 			mods_output_detail( f, outptr, parts[0].pos, "page", level );
@@ -681,7 +685,7 @@ output_partpages( fields *f, FILE *outptr, int level, int wrote_header )
 		if ( parts[3].pos!=-1 )
 			mods_output_extents( f, outptr, -1, -1, parts[3].pos, "page", level );
 	}
-	/* If both PAGESTART and PAGEEND are defined */
+	/* If both PAGES:START and PAGES:STOP are defined */
 	else {
 		mods_output_extents( f, outptr, parts[0].pos, parts[1].pos, parts[3].pos, "page", level );
 	}
@@ -878,6 +882,7 @@ output_sn( fields *f, FILE *outptr, int level )
 		{ "pubmed",    "PMID",      0, 0 },
 		{ "medline",   "MEDLINE",   0, 0 },
 		{ "pii",       "PII",       0, 0 },
+		{ "pmc",       "PMC",       0, 0 },
 		{ "arXiv",     "ARXIV",     0, 0 },
 		{ "isi",       "ISIREFNUM", 0, 0 },
 		{ "accessnum", "ACCESSNUM", 0, 0 },
@@ -1062,7 +1067,7 @@ modsout_report_unused_tags( fields *f, param *p, unsigned long numrefs )
 		for ( i=0; i<n; ++i ) {
 			if ( fields_level( f, i ) != 0 ) continue;
 			tag = fields_tag( f, i, FIELDS_CHRP_NOUSE );
-			if ( strcasecmp( tag, "YEAR" ) && strcasecmp( tag, "PARTYEAR" ) ) continue;
+			if ( strcasecmp( tag, "DATE:YEAR" ) && strcasecmp( tag, "PARTDATE:YEAR" ) ) continue;
 			value = fields_value( f, i, FIELDS_CHRP_NOUSE );
 			if ( nwritten==0 ) fprintf( stderr, "\tYear(s) (level=0):\n" );
 			fprintf( stderr, "\t\t'%s'\n", value );
@@ -1091,12 +1096,12 @@ modsout_report_unused_tags( fields *f, param *p, unsigned long numrefs )
 	}
 }
 
-void
+static void
 modsout_write( fields *f, FILE *outptr, param *p, unsigned long numrefs )
 {
 	int max, dropkey;
 	max = fields_maxlevel( f );
-	dropkey = ( p->format_opts & MODSOUT_DROPKEY );
+	dropkey = ( p->format_opts & BIBL_FORMAT_MODSOUT_DROPKEY );
 
 	output_head( f, outptr, dropkey, numrefs );
 	output_citeparts( f, outptr, 0, max );
@@ -1106,7 +1111,7 @@ modsout_write( fields *f, FILE *outptr, param *p, unsigned long numrefs )
 	fflush( outptr );
 }
 
-void
+static void
 modsout_writeheader( FILE *outptr, param *p )
 {
 	if ( p->utf8bom ) utf8_writebom( outptr );
@@ -1115,7 +1120,7 @@ modsout_writeheader( FILE *outptr, param *p )
 	fprintf(outptr,"<modsCollection xmlns=\"http://www.loc.gov/mods/v3\">\n");
 }
 
-void
+static void
 modsout_writefooter( FILE *outptr )
 {
 	fprintf(outptr,"</modsCollection>\n");

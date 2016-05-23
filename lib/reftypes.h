@@ -27,16 +27,17 @@
 #define LINKEDFILE      (12)
 #define KEYWORD         (13)
 #define BT_URL          (14) /* Bibtex URL */
-#define BT_NOTE         (15) /* Bibtex Note */
-#define BT_SENTE        (16) /* Bibtex 'Sente' */
-#define BT_GENRE        (17) /* Bibtex Genre */
-#define BT_EPRINT       (18) /* Bibtex 'Eprint' */
-#define BT_ORG          (19) /* Bibtex Organization */
-#define BLT_THESIS_TYPE (20) /* Biblatex Thesis Type */
-#define BLT_SCHOOL      (21) /* Biblatex School */
-#define BLT_EDITOR      (22) /* Biblatex Editor */
-#define BLT_SUBTYPE     (23) /* Biblatex entrysubtype */
-#define BLT_SKIP        (24) /* Biblatex Skip Entry */
+#define BT_SENTE        (15) /* Bibtex 'Sente' */
+#define BT_GENRE        (16) /* Bibtex Genre */
+#define BT_EPRINT       (17) /* Bibtex 'Eprint' */
+#define BT_ORG          (18) /* Bibtex Organization */
+#define BLT_THESIS_TYPE (19) /* Biblatex Thesis Type */
+#define BLT_SCHOOL      (20) /* Biblatex School */
+#define BLT_EDITOR      (21) /* Biblatex Editor */
+#define BLT_SUBTYPE     (22) /* Biblatex entrysubtype */
+#define BLT_SKIP        (23) /* Biblatex Skip Entry */
+#define EPRINT          (24)
+#define NUM_REFTYPES    (25)
 
 typedef struct {
 	char *oldstr;

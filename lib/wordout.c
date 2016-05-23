@@ -14,7 +14,11 @@
 #include "newstr.h"
 #include "fields.h"
 #include "utf8.h"
-#include "wordout.h"
+#include "bibformats.h"
+
+static void wordout_writeheader( FILE *outptr, param *p );
+static void wordout_writefooter( FILE *outptr );
+static void wordout_write( fields *info, FILE *outptr, param *p, unsigned long numrefs );
 
 void
 wordout_initparams( param *p, const char *progname )
@@ -41,8 +45,9 @@ wordout_initparams( param *p, const char *progname )
 }
 
 typedef struct convert {
-	char oldtag[25];
-	char newtag[25];
+	char *oldtag;
+	char *newtag;
+	char *prefix;
 	int  code;
 } convert;
 
@@ -113,12 +118,12 @@ output_fixed( FILE *outptr, char *tag, char *data, int level )
  *
  */
 static void
-output_item( fields *info, FILE *outptr, char *tag, int item, int level )
+output_item( fields *info, FILE *outptr, char *tag, char *prefix, int item, int level )
 {
 	int i;
 	if ( item==-1 ) return;
 	for ( i=0; i<level; ++i ) fprintf( outptr, " " );
-	fprintf( outptr, "<%s>%s</%s>\n", tag, info->data[item].data, tag );
+	fprintf( outptr, "<%s>%s%s</%s>\n", tag, prefix, info->data[item].data, tag );
 	fields_setused( info, item );
 }
 
@@ -157,7 +162,7 @@ output_list( fields *info, FILE *outptr, convert *c, int nc )
         int i, n;
         for ( i=0; i<nc; ++i ) {
                 n = fields_find( info, c[i].oldtag, c[i].code );
-                if ( n!=-1 ) output_item( info, outptr, c[i].newtag, n, 0 );
+                if ( n!=-1 ) output_item( info, outptr, c[i].newtag, c[i].prefix, n, 0 );
         }
 
 }
@@ -443,11 +448,11 @@ static void
 output_date( fields *info, FILE *outptr, int level )
 {
 	char *year  = fields_findv_firstof( info, level, FIELDS_CHRP,
-			"PARTYEAR", "YEAR", NULL );
+			"PARTDATE:YEAR", "DATE:YEAR", NULL );
 	char *month = fields_findv_firstof( info, level, FIELDS_CHRP,
-			"PARTMONTH", "MONTH", NULL );
+			"PARTDATE:MONTH", "DATE:MONTH", NULL );
 	char *day   = fields_findv_firstof( info, level, FIELDS_CHRP,
-			"PARTDAY", "DAY", NULL );
+			"PARTDATE:DAY", "DATE:DAY", NULL );
 	if ( year )  output_itemv( outptr, "b:Year", year, 0 );
 	if ( month ) output_itemv( outptr, "b:Month", month, 0 );
 	if ( day )   output_itemv( outptr, "b:Day", day, 0 );
@@ -456,8 +461,8 @@ output_date( fields *info, FILE *outptr, int level )
 static void
 output_pages( fields *info, FILE *outptr, int level )
 {
-	char *sn = fields_findv( info, LEVEL_ANY, FIELDS_CHRP, "PAGESTART" );
-	char *en = fields_findv( info, LEVEL_ANY, FIELDS_CHRP, "PAGEEND" );
+	char *sn = fields_findv( info, LEVEL_ANY, FIELDS_CHRP, "PAGES:START" );
+	char *en = fields_findv( info, LEVEL_ANY, FIELDS_CHRP, "PAGES:STOP" );
 	char *ar = fields_findv( info, LEVEL_ANY, FIELDS_CHRP, "ARTICLENUMBER" );
 	if ( sn || en )
 		output_range( outptr, "b:Pages", sn, en, level );
@@ -508,7 +513,7 @@ output_thesisdetails( fields *info, FILE *outptr, int type )
 			strcasecmp( tag, "DEGREEGRANTOR:ASIS") &
 			strcasecmp( tag, "DEGREEGRANTOR:CORP"))
 				continue;
-		output_item( info, outptr, "b:Institution", i, 0 );
+		output_item( info, outptr, "b:Institution", "", i, 0 );
 	}
 }
 
@@ -589,20 +594,25 @@ static void
 output_citeparts( fields *info, FILE *outptr, int level, int max, int type )
 {
 	convert origin[] = {
-		{ "ADDRESS",	"b:City",	LEVEL_ANY },
-		{ "PUBLISHER",	"b:Publisher",	LEVEL_ANY },
-		{ "EDITION",	"b:Edition",	LEVEL_ANY }
+		{ "ADDRESS",	"b:City",	"", LEVEL_ANY },
+		{ "PUBLISHER",	"b:Publisher",	"", LEVEL_ANY },
+		{ "EDITION",	"b:Edition",	"", LEVEL_ANY }
 	};
 	int norigin = sizeof( origin ) / sizeof ( convert );
 	
 	convert parts[] = {
-		{ "VOLUME",          "b:Volume",  LEVEL_ANY },
-		{ "SECTION",         "b:Section", LEVEL_ANY },
-		{ "ISSUE",           "b:Issue",   LEVEL_ANY },
-		{ "NUMBER",          "b:Issue",   LEVEL_ANY },
-		{ "PUBLICLAWNUMBER", "b:Volume",  LEVEL_ANY },
-		{ "SESSION",         "b:Issue",   LEVEL_ANY },
-		{ "URL",             "b:Url",     LEVEL_ANY },
+		{ "VOLUME",          "b:Volume",  "", LEVEL_ANY },
+		{ "SECTION",         "b:Section", "", LEVEL_ANY },
+		{ "ISSUE",           "b:Issue",   "", LEVEL_ANY },
+		{ "NUMBER",          "b:Issue",   "", LEVEL_ANY },
+		{ "PUBLICLAWNUMBER", "b:Volume",  "", LEVEL_ANY },
+		{ "SESSION",         "b:Issue",   "", LEVEL_ANY },
+		{ "URL",             "b:Url",     "", LEVEL_ANY },
+		{ "JSTOR",           "b:Url",     "http://www.jstor.org/stable/", LEVEL_ANY },
+		{ "ARXIV",           "b:Url",     "http://arxiv.org/abs/",        LEVEL_ANY },
+		{ "PMID",            "b:Url",     "http://www.ncbi.nlm.nih.gov/pubmed/", LEVEL_ANY },
+		{ "PMC",             "b:Url",     "http://www.ncbi.nlm.nih.gov/pmc/articles/", LEVEL_ANY },
+		{ "DOI",             "b:Url",     "http://dx.doi.org/", LEVEL_ANY },
 	};
 	int nparts=sizeof(parts)/sizeof(convert);
 	
@@ -618,7 +628,7 @@ output_citeparts( fields *info, FILE *outptr, int level, int max, int type )
 	output_comments( info, outptr, level );
 }
 
-void
+static void
 wordout_write( fields *info, FILE *outptr, param *p, unsigned long numrefs )
 {
 	int max = fields_maxlevel( info );
@@ -631,7 +641,7 @@ wordout_write( fields *info, FILE *outptr, param *p, unsigned long numrefs )
 	fflush( outptr );
 }
 
-void
+static void
 wordout_writeheader( FILE *outptr, param *p )
 {
 	if ( p->utf8bom ) utf8_writebom( outptr );
@@ -641,7 +651,7 @@ wordout_writeheader( FILE *outptr, param *p )
 		" xmlns=\"http://schemas.openxmlformats.org/officeDocument/2006/bibliography\" >\n");
 }
 
-void
+static void
 wordout_writefooter( FILE *outptr )
 {
 	fprintf(outptr,"</b:Sources>\n");

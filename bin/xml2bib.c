@@ -9,8 +9,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "bibutils.h"
-#include "modsin.h"
-#include "bibtexout.h"
+#include "bibformats.h"
 #include "args.h"
 #include "bibprog.h"
 
@@ -65,28 +64,28 @@ process_args( int *argc, char *argv[], param *p )
 			args_tellversion( p->progname );
 			exit( EXIT_SUCCESS );
 		} else if ( args_match( argv[i], "-fc", "--finalcomma" ) ) {
-			p->format_opts |= BIBOUT_FINALCOMMA;
+			p->format_opts |= BIBL_FORMAT_BIBOUT_FINALCOMMA;
 			subtract = 1;
 		} else if ( args_match( argv[i], "-s", "--single-refperfile" )){
 			p->singlerefperfile = 1;
 			subtract = 1;
 		} else if ( args_match( argv[i], "-sd", "--singledash" ) ) {
-			p->format_opts |= BIBOUT_SINGLEDASH;
+			p->format_opts |= BIBL_FORMAT_BIBOUT_SINGLEDASH;
 			subtract = 1;
 		} else if ( args_match( argv[i], "-b", "--brackets" ) ) {
-			p->format_opts |= BIBOUT_BRACKETS;
+			p->format_opts |= BIBL_FORMAT_BIBOUT_BRACKETS;
 			subtract = 1;
 		} else if ( args_match( argv[i], "-w", "--whitespace" ) ) {
-			p->format_opts |= BIBOUT_WHITESPACE;
+			p->format_opts |= BIBL_FORMAT_BIBOUT_WHITESPACE;
 			subtract = 1;
 		} else if ( args_match( argv[i], "-sk", "--strictkey" ) ) {
-			p->format_opts |= BIBOUT_STRICTKEY;
+			p->format_opts |= BIBL_FORMAT_BIBOUT_STRICTKEY;
 			subtract = 1;
 		} else if ( args_match( argv[i], "-U", "--uppercase" ) ) {
-			p->format_opts |= BIBOUT_UPPERCASE;
+			p->format_opts |= BIBL_FORMAT_BIBOUT_UPPERCASE;
 			subtract = 1;
 		} else if ( args_match( argv[i], "-at", "--abbreviated-titles" ) ) {
-			p->format_opts |= BIBOUT_SHORTTITLE;
+			p->format_opts |= BIBL_FORMAT_BIBOUT_SHORTTITLE;
 			subtract = 1;
 		} else if ( args_match( argv[i], "-nl", "--no-latex" ) ) {
 			p->latexout = 0;
@@ -95,7 +94,7 @@ process_args( int *argc, char *argv[], param *p )
 			p->utf8bom = 0;
 			subtract = 1;
 		} else if ( args_match( argv[i], "-d", "--drop-key" ) ) {
-			p->format_opts |= BIBOUT_DROPKEY;
+			p->format_opts |= BIBL_FORMAT_BIBOUT_DROPKEY;
 			subtract = 1;
 		} else if ( args_match( argv[i], "--verbose", "" ) ) {
 			p->verbose = 1;
@@ -127,5 +126,3 @@ main( int argc, char *argv[] )
 	bibl_freeparams( &p );
 	return EXIT_SUCCESS;
 }
-
-

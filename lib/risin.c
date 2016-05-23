@@ -18,11 +18,21 @@
 #include "serialno.h"
 #include "reftypes.h"
 #include "doi.h"
-#include "risin.h"
+#include "bibformats.h"
+#include "generic.h"
+
+extern variants ris_all[];
+extern int ris_nall;
 
 /*****************************************************
  PUBLIC: void risin_initparams()
 *****************************************************/
+
+static int risin_readf( FILE *fp, char *buf, int bufsize, int *bufpos, newstr *line, newstr *reference, int *fcharset );
+static int risin_processf( fields *risin, char *p, char *filename, long nref, param *pm );
+static int risin_typef( fields *risin, char *filename, int nref, param *p );
+static int risin_convertf( fields *risin, fields *info, int reftype, param *p );
+
 void
 risin_initparams( param *p, const char *progname )
 {
@@ -84,7 +94,7 @@ readmore( FILE *fp, char *buf, int bufsize, int *bufpos, newstr *line )
 	else return newstr_fget( fp, buf, bufsize, bufpos, line );
 }
 
-int
+static int
 risin_readf( FILE *fp, char *buf, int bufsize, int *bufpos, newstr *line, 
 		newstr *reference, int *fcharset )
 {
@@ -168,8 +178,8 @@ process_line( newstr *tag, newstr *data, char *p )
 	return p;
 }
 
-int
-risin_processf( fields *risin, char *p, char *filename, long nref )
+static int
+risin_processf( fields *risin, char *p, char *filename, long nref, param *pm )
 {
 	newstr tag, data;
 	int status, n;
@@ -204,8 +214,8 @@ risin_processf( fields *risin, char *p, char *filename, long nref )
  PUBLIC: int risin_typef()
 *****************************************************/
 
-int
-risin_typef( fields *risin, char *filename, int nref, param *p, variants *all, int nall )
+static int
+risin_typef( fields *risin, char *filename, int nref, param *p )
 {
 	char *refnum = "";
 	int n, reftype, nreftype;
@@ -214,33 +224,15 @@ risin_typef( fields *risin, char *filename, int nref, param *p, variants *all, i
 	if ( nreftype!=-1 ) refnum = risin[n].data->data;
 	if ( n!=-1 )
 		reftype = get_reftype( (risin[n].data)->data, nref, p->progname,
-			all, nall, refnum );
+			p->all, p->nall, refnum );
 	else
-		reftype = get_reftype( "", nref, p->progname, all, nall, refnum ); /*default */
+		reftype = get_reftype( "", nref, p->progname, p->all, p->nall, refnum ); /*default */
 	return reftype;
 }
 
 /*****************************************************
  PUBLIC: int risin_convertf()
 *****************************************************/
-
-/* oxfordjournals hide the DOI in the NOTES N1 field */
-static int
-risin_addnotes( fields *f, char *tag, newstr *s, int level )
-{
-	int doi, status;
-	doi = is_doi( s->data );
-	if ( doi!=-1 )
-		status = fields_add( f, "DOI", &(s->data[doi]), level );
-	else {
-		if ( !strncasecmp( "http:", s->data, 5 ) || !strncasecmp( "https:", s->data, 6 ) )
-			status = fields_add( f, "URL", s->data, level );
-		else
-			status = fields_add( f, tag, s->data, level );
-	}
-	if ( status==FIELDS_OK ) return BIBL_OK;
-	else return BIBL_ERR_MEMERR;
-}
 
 static int
 is_uri_file_scheme( char *p )
@@ -250,76 +242,63 @@ is_uri_file_scheme( char *p )
 }
 
 static int
-is_uri_remote_scheme( char *p )
+risin_linkedfile( fields *bibin, newstr *intag, newstr *invalue, int level, param *pm, char *outtag, fields *bibout )
 {
-	char *scheme[] = { "http:", "ftp:", "git:", "gopher:" };
-	int i, len, nschemes = sizeof( scheme ) / sizeof( scheme[0] );
-	for ( i=0; i<nschemes; ++i ) {
-		len = strlen( scheme[i] );
-		if ( !strncmp( p, scheme[i], len ) ) return len;
-	}
-	return 0;
-}
-
-static int
-risin_addfile( fields *f, char *tag, newstr *s, int level )
-{
-	int status, n;
+	int fstatus, n;
 	char *p;
 
 	/* if URL is file:///path/to/xyz.pdf, only store "///path/to/xyz.pdf" */
-	n = is_uri_file_scheme( s->data );
+	n = is_uri_file_scheme( invalue->data );
 	if ( n ) {
 		/* skip past "file:" and store only actual path */
-		p = s->data + n;
-		status = fields_add( f, tag, p, level );
-		if ( status==FIELDS_OK ) return BIBL_OK;
+		p = invalue->data + n;
+		fstatus = fields_add( bibout, outtag, p, level );
+		if ( fstatus==FIELDS_OK ) return BIBL_OK;
 		else return BIBL_ERR_MEMERR;
 	}
 
 	/* if URL is http:, ftp:, etc. store as a URL */
-	n = is_uri_remote_scheme( s->data );
-	if ( n ) {
-		status = fields_add( f, "URL", s->data, level );
-		if ( status==FIELDS_OK ) return BIBL_OK;
+	n = is_uri_remote_scheme( invalue->data );
+	if ( n!=-1 ) {
+		fstatus = fields_add( bibout, "URL", invalue->data, level );
+		if ( fstatus==FIELDS_OK ) return BIBL_OK;
 		else return BIBL_ERR_MEMERR;
 	}
 
 	/* badly formed, RIS wants URI, but store value anyway */
-	status = fields_add( f, tag, s->data, level );
-	if ( status==FIELDS_OK ) return BIBL_OK;
+	fstatus = fields_add( bibout, outtag, invalue->data, level );
+	if ( fstatus==FIELDS_OK ) return BIBL_OK;
 	else return BIBL_ERR_MEMERR;
 }
 
 /* scopus puts DOI in the DO or DI tag, but it needs cleaning */
 static int
-risin_adddoi( fields *f, char *tag, newstr *s, int level )
+risin_doi( fields *bibin, newstr *intag, newstr *invalue, int level, param *pm, char *outtag, fields *bibout )
 {
-	int status, doi;
-	doi = is_doi( s->data );
+	int fstatus, doi;
+	doi = is_doi( invalue->data );
 	if ( doi!=-1 ) {
-		status = fields_add( f, "DOI", &(s->data[doi]), level );
-		if ( status==FIELDS_OK ) return BIBL_OK;
-		else return BIBL_ERR_MEMERR;
+		fstatus = fields_add( bibout, "DOI", &(invalue->data[doi]), level );
+		if ( fstatus!=FIELDS_OK ) return BIBL_ERR_MEMERR;
 	}
-	else return BIBL_OK;
+	return BIBL_OK;
 }
 
 static int
-risin_adddate( fields *f, char *tag, newstr *d, int level )
+risin_date( fields *bibin, newstr *intag, newstr *invalue, int level, param *pm, char *outtag, fields *bibout )
 {
-	char *p = d->data;
+	char *p = invalue->data;
 	newstr date;
 	int part, status;
 
-	part = ( !strncasecmp( tag, "PART", 4 ) );
+	part = ( !strncasecmp( outtag, "PART", 4 ) );
 
 	newstr_init( &date );
 	while ( *p && *p!='/' ) newstr_addchar( &date, *p++ );
 	if ( *p=='/' ) p++;
 	if ( date.len>0 ) {
-		if ( part ) status = fields_add( f, "PARTYEAR", date.data, level );
-		else        status = fields_add( f, "YEAR",     date.data, level );
+		if ( part ) status = fields_add( bibout, "PARTDATE:YEAR", date.data, level );
+		else        status = fields_add( bibout, "DATE:YEAR",     date.data, level );
 		if ( status!=FIELDS_OK ) return BIBL_ERR_MEMERR;
 	}
 
@@ -327,8 +306,8 @@ risin_adddate( fields *f, char *tag, newstr *d, int level )
 	while ( *p && *p!='/' ) newstr_addchar( &date, *p++ );
 	if ( *p=='/' ) p++;
 	if ( date.len>0 ) {
-		if ( part ) status = fields_add( f, "PARTMONTH", date.data, level );
-		else        status = fields_add( f, "MONTH",     date.data, level );
+		if ( part ) status = fields_add( bibout, "PARTDATE:MONTH", date.data, level );
+		else        status = fields_add( bibout, "DATE:MONTH",     date.data, level );
 		if ( status!=FIELDS_OK ) return BIBL_ERR_MEMERR;
 	}
 
@@ -336,19 +315,45 @@ risin_adddate( fields *f, char *tag, newstr *d, int level )
 	while ( *p && *p!='/' ) newstr_addchar( &date, *p++ );
 	if ( *p=='/' ) p++;
 	if ( date.len>0 ) {
-		if ( part ) status = fields_add( f, "PARTDAY", date.data, level );
-		else        status = fields_add( f, "DAY",     date.data, level );
+		if ( part ) status = fields_add( bibout, "PARTDATE:DAY", date.data, level );
+		else        status = fields_add( bibout, "DATE:DAY",     date.data, level );
 		if ( status!=FIELDS_OK ) return BIBL_ERR_MEMERR;
 	}
 
 	newstr_empty( &date );
 	while ( *p ) newstr_addchar( &date, *p++ );
 	if ( date.len>0 ) {
-		if ( part ) status = fields_add( f, "PARTDATEOTHER", date.data,level);
-		else        status = fields_add( f, "DATEOTHER", date.data, level );
+		if ( part ) status = fields_add( bibout, "PARTDATE:OTHER", date.data,level);
+		else        status = fields_add( bibout, "DATE:OTHER", date.data, level );
 		if ( status!=FIELDS_OK ) return BIBL_ERR_MEMERR;
 	}
 	newstr_free( &date );
+	return BIBL_OK;
+}
+
+/* look for thesis-type hint */
+static int
+risin_thesis_hints( fields *bibin, int reftype, param *p, fields *bibout )
+{
+	int i, nfields, fstatus;
+	char *tag, *value;
+
+	if ( strcasecmp( p->all[reftype].type, "THES" ) ) return BIBL_OK;
+
+	nfields = fields_num( bibin );
+	for ( i=0; i<nfields; ++i ) {
+		tag = fields_tag( bibin, i, FIELDS_CHRP );
+		if ( strcasecmp( tag, "U1" ) ) continue;
+		value = fields_value( bibin, i, FIELDS_CHRP );
+		if ( !strcasecmp(value,"Ph.D. Thesis")||
+		     !strcasecmp(value,"Masters Thesis")||
+		     !strcasecmp(value,"Diploma Thesis")||
+		     !strcasecmp(value,"Doctoral Thesis")||
+		     !strcasecmp(value,"Habilitation Thesis")) {
+			fstatus = fields_add( bibout, "GENRE", value, 0 );
+			if ( fstatus!=FIELDS_OK ) return BIBL_ERR_MEMERR;
+		}
+	}
 	return BIBL_OK;
 }
 
@@ -362,97 +367,40 @@ risin_report_notag( param *p, char *tag )
 }
 
 static int
-risin_simple( fields *f, char *tag, char *value, int level )
+risin_convertf( fields *bibin, fields *bibout, int reftype, param *p )
 {
-	int fstatus = fields_add( f, tag, value, level );
-	if ( fstatus==FIELDS_OK ) return BIBL_OK;
-	else return BIBL_ERR_MEMERR;
-}
+	static int (*convertfns[NUM_REFTYPES])(fields *, newstr *, newstr *, int, param *, char *, fields *) = {
+		[ 0 ... NUM_REFTYPES-1 ] = generic_null,
+		[ SIMPLE       ] = generic_simple,
+		[ TITLE        ] = generic_title,
+		[ PERSON       ] = generic_person,
+		[ SERIALNO     ] = generic_serialno,
+		[ NOTES        ] = generic_notes,
+		[ DATE         ] = risin_date,
+		[ DOI          ] = risin_doi,
+		[ LINKEDFILE   ] = risin_linkedfile,
+        };
+	int process, level, i, nfields, status = BIBL_OK;
+	newstr *intag, *invalue;
+	char *outtag;
 
-int
-risin_convertf( fields *risin, fields *f, int reftype, param *p, variants *all, int nall )
-{
-	int process, level, i, n, nfields, ok, fstatus, status = BIBL_OK;
-	char *outtag, *tag, *value;
-	newstr *t, *d;
-
-	nfields = fields_num( risin );
+	nfields = fields_num( bibin );
 
 	for ( i=0; i<nfields; ++i ) {
-		t = fields_tag( risin, i, FIELDS_STRP );
-		n = translate_oldtag( t->data, reftype, all, nall, &process, &level, &outtag );
-		if ( n==-1 ) {
-			risin_report_notag( p, t->data );
+		intag = fields_tag( bibin, i, FIELDS_STRP );
+		if ( !translate_oldtag( intag->data, reftype, p->all, p->nall, &process, &level, &outtag ) ) {
+			risin_report_notag( p, intag->data );
 			continue;
 		}
-		if ( process==ALWAYS ) continue; /* add in core code */
+		invalue = fields_value( bibin, i, FIELDS_STRP );
 
-		d = fields_value( risin, i, FIELDS_STRP );
-
-		switch ( process ) {
-
-		case SIMPLE:
-			status = risin_simple( f, outtag, d->data, level );
-			break;
-
-		case PERSON:
-			ok = name_add( f, outtag, d->data, level, &(p->asis), &(p->corps) );
-			if ( ok ) status = BIBL_OK;
-			else status = BIBL_ERR_MEMERR;
-			break;
-
-		case TITLE:
-			ok = title_process( f, outtag, d->data, level, p->nosplittitle );
-			if ( ok ) status = BIBL_OK;
-			else status = BIBL_ERR_MEMERR;
-			break;
-
-		case SERIALNO:
-			ok = addsn( f, d->data, level );
-			if ( ok ) status = BIBL_OK;
-			else status = BIBL_ERR_MEMERR;
-			break;
-
-		case DATE:
-			status = risin_adddate( f, outtag, d, level );
-			break;
-
-		case NOTES:
-			status = risin_addnotes( f, outtag, d, level );
-			break;
-
-		case DOI:
-			status = risin_adddoi( f, outtag, d, level );
-			break;
-
-		case LINKEDFILE:
-			status = risin_addfile( f, outtag, d, level );
-			break;
-
-		default:
-			status = BIBL_OK;
-			break;
-
-		}
+		status = convertfns[ process ] ( bibin, intag, invalue, level, p, outtag, bibout );
 		if ( status!=BIBL_OK ) return status;
 	}
 
-	/* look for thesis-type hint */
-	if ( !strcasecmp( all[reftype].type, "THES" ) ) {
-		for ( i=0; i<nfields; ++i ) {
-			tag = fields_tag( risin, i, FIELDS_CHRP );
-			if ( strcasecmp( tag, "U1" ) ) continue;
-			value = fields_value( risin, i, FIELDS_CHRP );
-			if ( !strcasecmp(value,"Ph.D. Thesis")||
-			     !strcasecmp(value,"Masters Thesis")||
-			     !strcasecmp(value,"Diploma Thesis")||
-			     !strcasecmp(value,"Doctoral Thesis")||
-			     !strcasecmp(value,"Habilitation Thesis")) {
-				fstatus = fields_add( f, "GENRE", value, 0 );
-				if ( fstatus!=FIELDS_OK ) return BIBL_ERR_MEMERR;
-			}
-		}
-	}
+	if ( status == BIBL_OK ) status = risin_thesis_hints( bibin, reftype, p, bibout );
+
+	if ( status==BIBL_OK && p->verbose ) fields_report( bibout, stderr );
 
 	return status;
 }

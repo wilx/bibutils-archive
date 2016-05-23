@@ -9,8 +9,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "bibutils.h"
-#include "modsin.h"
-#include "risout.h"
+#include "bibformats.h"
 #include "args.h"
 #include "bibprog.h"
 
@@ -89,5 +88,3 @@ main(int argc, char *argv[])
 	bibl_freeparams( &p );
 	return EXIT_SUCCESS;
 }
-
-

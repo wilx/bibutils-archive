@@ -161,7 +161,7 @@ fields_add_tagsuffix( fields *f, char *tag, char *suffix,
  *
  * level==LEVEL_ANY is a special flag meaning any level can match
  */
-inline int
+int
 fields_match_level( fields *f, int n, int level )
 {
 	if ( level==LEVEL_ANY ) return 1;
@@ -174,28 +174,28 @@ fields_match_level( fields *f, int n, int level )
  * returns 1 if tag matches, 0 if not
  *
  */
-inline int
+int
 fields_match_tag( fields *info, int n, char *tag )
 {
 	if ( !strcmp( fields_tag( info, n, FIELDS_CHRP ), tag ) ) return 1;
 	return 0;
 }
 
-inline int
+int
 fields_match_casetag( fields *info, int n, char *tag )
 {
 	if ( !strcasecmp( fields_tag( info, n, FIELDS_CHRP ), tag ) ) return 1;
 	return 0;
 }
 
-inline int
+int
 fields_match_tag_level( fields *info, int n, char *tag, int level )
 {
 	if ( !fields_match_level( info, n, level ) ) return 0;
 	return fields_match_tag( info, n, tag );
 }
 
-inline int
+int
 fields_match_casetag_level( fields *info, int n, char *tag, int level )
 {
 	if ( !fields_match_level( info, n, level ) ) return 0;
@@ -276,27 +276,36 @@ fields_replace_or_add( fields *f, char *tag, char *data, int level )
 
 char *fields_null_value = "\0";
 
-inline int
+int
 fields_used( fields *f, int n )
 {
 	if ( n >= 0 && n < f->n ) return f->used[n];
 	else return 0;
 }
 
-inline int
+int
+fields_notag( fields *f, int n )
+{
+	newstr *t;
+	if ( n >= 0 && n < f->n ) {
+		t = &( f->tag[n] );
+		if ( t->len > 0 ) return 0;
+	}
+	return 1;
+}
+
+int
 fields_nodata( fields *f, int n )
 {
 	newstr *d;
 	if ( n >= 0 && n < f->n ) {
 		d = &( f->data[n] );
 		if ( d->len > 0 ) return 0;
-		return 1;
-	} else {
-		return 1;
 	}
+	return 1;
 }
 
-inline int
+int
 fields_num( fields *f )
 {
 	return f->n;
@@ -504,3 +513,20 @@ fields_findv_eachof( fields *f, int level, int mode, vplist *a, ... )
 
 	vplist_free( &tags );
 }
+
+void
+fields_report( fields *f, FILE *fp )
+{
+	int i, n;
+	n = fields_num( f );
+	fprintf( fp, "# NUM   level = LEVEL   'TAG' = 'VALUE'\n" );
+	for ( i=0; i<n; ++i ) {
+		fprintf( stderr, "%d\tlevel = %d\t'%s' = '%s'\n",
+			i+1,
+			fields_level( f, i ),
+			(char*)fields_tag( f, i, FIELDS_CHRP_NOUSE ),
+			(char*)fields_value( f, i, FIELDS_CHRP_NOUSE )
+		);
+	}
+}
+

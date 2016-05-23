@@ -3,7 +3,8 @@
 #
 
 CFLAGS     = -I ../lib $(CFLAGSIN)
-PROGS      = entities_test \
+PROGS      = doi_test \
+             entities_test \
              list_test \
              newstr_test \
              utf8_test
@@ -16,6 +17,9 @@ entities_test : entities_test.o ../lib/libbibcore.a
 utf8_test : utf8_test.o ../lib/libbibcore.a
 	$(CC) $(LDFLAGS) $^ $(LOADLIBES) $(LDLIBS) -o $@
 
+doi_test : doi_test.o ../lib/libbibcore.a
+	$(CC) $(LDFLAGS) $^ $(LOADLIBES) $(LDLIBS) -o $@
+
 newstr_test : newstr_test.o ../lib/libbibcore.a
 	$(CC) $(LDFLAGS) $^ $(LOADLIBES) $(LDLIBS) -o $@
 
@@ -26,6 +30,7 @@ test: $(PROGS) FORCE
 	./newstr_test
 	./list_test
 	./entities_test
+	./doi_test
 	./utf8_test
 
 clean:
