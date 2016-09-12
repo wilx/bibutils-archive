@@ -369,7 +369,7 @@ name_addmultielement( fields *info, char *tag, list *tokens, int begin, int end,
 	newstr_init( &name );
 
 	name_construct_multi( &name, tokens, begin, end );
-	status = fields_add( info, tag, name.data, level );
+	status = fields_add_can_dup( info, tag, name.data, level );
 	if ( status!=FIELDS_OK ) ok = 0;
 
 	newstr_free( &name );
@@ -393,7 +393,7 @@ name_addsingleelement( fields *info, char *tag, char *name, int level, int corp 
 	newstr_strcpy( &outtag, tag );
 	if ( !corp ) newstr_strcat( &outtag, ":ASIS" );
 	else newstr_strcat( &outtag, ":CORP" );
-	status = fields_add( info, outtag.data, name, level );
+	status = fields_add_can_dup( info, outtag.data, name, level );
 	if ( status!=FIELDS_OK ) ok = 0;
 	newstr_free( &outtag );
 	return ok;
@@ -505,7 +505,7 @@ name_add( fields *info, char *tag, char *q, int level, list *asis, list *corps )
 		if ( !nametype ) { ret = 0; goto out; }
 
 		if ( nametype==1 ) {
-			status = fields_add( info, tag, outname.data, level );
+			status = fields_add_can_dup( info, tag, outname.data, level );
 			ok = ( status==FIELDS_OK ) ? 1 : 0;
 		}
 		else if ( nametype==2 )

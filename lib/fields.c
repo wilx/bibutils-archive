@@ -105,9 +105,9 @@ fields_realloc( fields *f )
 }
 
 int
-fields_add( fields *f, char *tag, char *data, int level )
+_fields_add( fields *f, char *tag, char *data, int level, int mode )
 {
-	int i, status, found;
+	int i, n, status;
 
 	if ( !tag || !data ) return FIELDS_OK;
 
@@ -119,29 +119,33 @@ fields_add( fields *f, char *tag, char *data, int level )
 		if ( status!=FIELDS_OK ) return status;
 	}
 
-	/* Don't duplicate identical entries */
-	found = 0;
-	for ( i=0; i<f->n && !found; ++i ) {
-		if ( f->level[i]==level &&
-		     !strcasecmp( f->tag[i].data, tag ) &&
-		     !strcasecmp( f->data[i].data, data ) ) found = 1;
+	/* Don't duplicate identical entries if FIELDS_NO_DUPS */
+	if ( mode == FIELDS_NO_DUPS ) {
+		for ( i=0; i<f->n; i++ ) {
+			if ( f->level[i]==level &&
+			     !strcasecmp( f->tag[i].data, tag ) &&
+			     !strcasecmp( f->data[i].data, data ) )
+				return FIELDS_OK;
+		}
 	}
-	if ( !found ) {
-		f->used[ f->n ]  = 0;
-		f->level[ f->n ] = level;
-		newstr_strcpy( &(f->tag[f->n]), tag );
-		newstr_strcpy( &(f->data[f->n]), data );
-		if ( newstr_memerr( &(f->tag[f->n]) ) ||
-		     newstr_memerr( &(f->data[f->n] ) ) )
-			return FIELDS_ERR;
-		f->n++;
-	}
+
+	n = f->n;
+	f->used[ n ]  = 0;
+	f->level[ n ] = level;
+	newstr_strcpy( &(f->tag[n]), tag );
+	newstr_strcpy( &(f->data[n]), data );
+
+	if ( newstr_memerr( &(f->tag[n]) ) || newstr_memerr( &(f->data[n] ) ) )
+		return FIELDS_ERR;
+
+	f->n++;
+
 	return FIELDS_OK;
 }
 
 int
-fields_add_tagsuffix( fields *f, char *tag, char *suffix,
-		char *data, int level )
+_fields_add_tagsuffix( fields *f, char *tag, char *suffix,
+		char *data, int level, int mode )
 {
 	newstr newtag;
 	int ret;
@@ -149,7 +153,7 @@ fields_add_tagsuffix( fields *f, char *tag, char *suffix,
 	newstr_init( &newtag );
 	newstr_mergestrs( &newtag, tag, suffix, NULL );
 	if ( newstr_memerr( &newtag ) ) ret = FIELDS_ERR;
-	else ret = fields_add( f, newtag.data, data, level );
+	else ret = _fields_add( f, newtag.data, data, level, mode );
 	newstr_free( &newtag );
 
 	return ret;

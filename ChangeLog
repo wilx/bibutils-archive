@@ -1,7 +1,18 @@
 
 BIBUTILS
 
-58
+5.9
+9/12/16
+
+GLOBAL
++ Allow bibutils to properly process references with several authors of the
+same name (reported by Jason Annadani).
+
+MODSIN
++ Fix processing of mods input files where given name information isn't as
+finely parsed as bibutils mods files are (reported by Dan Gildea).
+
+5.8
 5/23/16
 
 INTERNAL

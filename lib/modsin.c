@@ -364,40 +364,6 @@ modsin_asis_corp_r( xml *node, newstr *name, newstr *role )
 }
 
 static int
-modsin_personr( xml *node, newstr *name, newstr *suffix, newstr *roles )
-{
-	newstr outname;
-	int status = BIBL_OK;
-	newstr_init( &outname );
-	if ( xml_tagexact( node, "namePart" ) ) {
-		if ( xml_tag_attrib( node, "namePart", "type", "family" ) ) {
-			if ( name->len ) newstr_prepend( name, "|" );
-			newstr_prepend( name, node->value->data );
-		} else if (xml_tag_attrib( node, "namePart", "type", "suffix") ||
-		           xml_tag_attrib( node, "namePart", "type", "termsOfAddress" )) {
-			if ( suffix->len ) newstr_addchar( suffix, ' ' );
-			newstr_strcat( suffix, node->value->data );
-		} else if (xml_tag_attrib( node, "namePart", "type", "date")){
-		} else {
-			if ( name->len ) newstr_addchar( name, '|' );
-			name_parse( &outname, node->value, NULL, NULL );
-			newstr_newstrcat( name, &outname );
-		}
-	} else if ( xml_tagexact( node, "roleTerm" ) ) {
-		if ( roles->len ) newstr_addchar( roles, '|' );
-		newstr_newstrcat( roles, node->value );
-	}
-	if ( node->down ) {
-		status = modsin_personr( node->down, name, suffix, roles );
-		if ( status!=BIBL_OK ) goto out;
-	}
-	if ( node->next ) status = modsin_personr( node->next, name, suffix, roles );
-out:
-	newstr_free( &outname );
-	return status;
-}
-
-static int
 modsin_asis_corp( xml *node, fields *info, int level, char *suffix )
 {
 	int fstatus, status = BIBL_OK;
@@ -418,30 +384,124 @@ out:
 }
 
 static int
+modsin_roler( xml *node, newstr *roles )
+{
+	int status = BIBL_OK;
+
+	if ( roles->len ) newstr_addchar( roles, '|' );
+	newstr_newstrcat( roles, node->value );
+	if ( newstr_memerr( roles ) ) status = BIBL_ERR_MEMERR;
+
+	return status;
+}
+
+static int
+modsin_personr( xml *node, newstr *familyname, newstr *givenname, newstr *suffix )
+{
+	int status = BIBL_OK;
+
+	if ( xml_tag_attrib( node, "namePart", "type", "family" ) ) {
+		if ( familyname->len ) newstr_addchar( familyname, ' ' );
+		newstr_newstrcat( familyname, node->value );
+		if ( newstr_memerr( familyname ) ) status = BIBL_ERR_MEMERR;
+	}
+
+	else if ( xml_tag_attrib( node, "namePart", "type", "suffix") ||
+	          xml_tag_attrib( node, "namePart", "type", "termsOfAddress" )) {
+		if ( suffix->len ) newstr_addchar( suffix, ' ' );
+		newstr_newstrcat( suffix, node->value );
+		if ( newstr_memerr( suffix ) ) status = BIBL_ERR_MEMERR;
+	}
+
+	else if (xml_tag_attrib( node, "namePart", "type", "date") ){
+		/* no nothing */
+	}
+
+	else {
+		if ( givenname->len ) newstr_addchar( givenname, '|' );
+		newstr_newstrcat( givenname, node->value );
+		if ( newstr_memerr( givenname ) ) status = BIBL_ERR_MEMERR;
+	}
+
+	return status;
+}
+
+static int
 modsin_person( xml *node, fields *info, int level )
 {
-	newstr name, suffix, roles, role_out;
+	newstr familyname, givenname, name, suffix, roles, role_out;
 	int fstatus, status = BIBL_OK;
-	xml *dnode = node->down;
-	if ( dnode ) {
-		newstrs_init( &name, &suffix, &roles, &role_out, NULL );
+	xml *dnode, *rnode;
 
-		status = modsin_personr( dnode, &name, &suffix, &roles );
-		if ( status!=BIBL_OK ) goto out;
-		if ( suffix.len ) {
-			newstr_strcat( &name, "||" );
-			newstr_newstrcat( &name, &suffix );
-			if ( newstr_memerr( &name ) ) { status=BIBL_ERR_MEMERR; goto out; }
+	dnode = node->down;
+	if ( !dnode ) return status;
+
+	newstrs_init( &name, &familyname, &givenname, &suffix, &roles, &role_out, NULL );
+
+	while ( dnode ) {
+
+		if ( xml_tagexact( dnode, "namePart" ) ) {
+			status = modsin_personr( dnode, &familyname, &givenname, &suffix );
+			if ( status!=BIBL_OK ) goto out;
 		}
 
-		status = modsin_marcrole_convert( &roles, NULL, &role_out );
-		if ( status!=BIBL_OK ) goto out;
+		else if ( xml_tagexact( dnode, "role" ) ) {
+			rnode = dnode->down;
+			while ( rnode ) {
+				if ( xml_tagexact( rnode, "roleTerm" ) ) {
+					status = modsin_roler( rnode, &roles );
+					if ( status!=BIBL_OK ) goto out;
+				}
+				rnode = rnode->next;
+			}
+		}
 
-		fstatus = fields_add( info, role_out.data, name.data, level );
-		if ( fstatus!=FIELDS_OK ) status = BIBL_ERR_MEMERR;
-out:
-		newstrs_free( &name, &suffix, &roles, &role_out, NULL );
+		dnode = dnode->next;
+
 	}
+
+	/*
+	 * Handle:
+	 *          <namePart type='given'>Noah A.</namePart>
+	 *          <namePart type='family'>Smith</namePart>
+	 * without mangling the order of "Noah A."
+	 */
+	if ( familyname.len ) {
+		newstr_newstrcpy( &name, &familyname );
+		if ( givenname.len ) {
+			newstr_addchar( &name, '|' );
+			newstr_newstrcat( &name, &givenname );
+		}
+	}
+
+	/*
+	 * Handle:
+	 *          <namePart>Noah A. Smith</namePart>
+	 * with name order mangling.
+	 */
+	else {
+		if ( givenname.len )
+			name_parse( &name, &givenname, NULL, NULL );
+	}
+
+	if ( suffix.len ) {
+		newstr_strcat( &name, "||" );
+		newstr_newstrcat( &name, &suffix );
+	}
+
+	if ( newstr_memerr( &name ) ) {
+		status=BIBL_ERR_MEMERR;
+		goto out;
+	}
+
+	status = modsin_marcrole_convert( &roles, NULL, &role_out );
+	if ( status!=BIBL_OK ) goto out;
+
+	fstatus = fields_add_can_dup( info, role_out.data, name.data, level );
+	if ( fstatus!=FIELDS_OK ) status = BIBL_ERR_MEMERR;
+
+out:
+	newstrs_free( &name, &familyname, &givenname, &suffix, &roles, &role_out, NULL );
 	return status;
 }
 

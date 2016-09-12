@@ -92,7 +92,7 @@ bibl_copy( bibl *bout, bibl *bin )
 			value = fields_value( refin, j, FIELDS_CHRP );
 			level = fields_level( refin, j );
 			if ( tag && value ) {
-				status = fields_add( refout, tag, value, level );
+				status = fields_add_can_dup( refout, tag, value, level );
 				if ( status!=FIELDS_OK ) return 0;
 			}
 		}

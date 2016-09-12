@@ -815,6 +815,13 @@ convert_ref( bibl *bin, char *fname, bibl *bout, param *p )
 		ok = bibl_addref( bout, rout );
 		if ( !ok ) return BIBL_ERR_MEMERR;
 	}
+	if ( debug_set( p ) ) {
+		fflush( stdout );
+		fprintf( stderr, "-------------------start for convert_ref\n");
+		bibl_verbose0( bout );
+		fprintf( stderr, "-------------------end for convert_ref\n" );
+		fflush( stderr );
+	}
 	status = uniqueify_citekeys( bout );
 	return status;
 }
@@ -980,7 +987,14 @@ bibl_write( bibl *b, FILE *fp, param *p )
 	status = bibl_fixcharsets( b, &lp );
 	if ( status!=BIBL_OK ) return status;
 
-	if ( debug_set( p ) ) report_params( stderr, "bibl_write", &lp );
+	if ( debug_set( p ) ) {
+		report_params( stderr, "bibl_write", &lp );
+		fflush( stdout );
+		fprintf( stderr, "-------------------start for bibl_write\n");
+		bibl_verbose0( b );
+		fprintf( stderr, "-------------------end for bibl_write\n" );
+		fflush( stderr );
+	}
 
 	if ( p->singlerefperfile ) status = bibl_writeeachfp( fp, b, &lp );
 	else status = bibl_writefp( fp, b, &lp );
