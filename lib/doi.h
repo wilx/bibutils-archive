@@ -21,5 +21,6 @@ void pmid_to_url( fields *info, int n, char *urltag, newstr *pmid_url );
 void pmc_to_url( fields *info, int n, char *urltag, newstr *pmid_url );
 void arxiv_to_url( fields *info, int n, char *urltag, newstr *arxiv_url );
 void jstor_to_url( fields *info, int n, char *urltag, newstr *jstor_url );
+void mrnumber_to_url( fields *info, int n, char *urltag, newstr *jstor_url );
 
 #endif

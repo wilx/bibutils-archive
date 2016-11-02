@@ -16,11 +16,12 @@
 #include "xml.h"
 #include "fields.h"
 #include "name.h"
+#include "title.h"
 #include "bibl.h"
 #include "doi.h"
 #include "bibformats.h"
 
-static void bibtexout_write( fields *info, FILE *fp, param *p, unsigned long refnum );
+static int  bibtexout_write( fields *in, FILE *fp, param *p, unsigned long refnum );
 static void bibtexout_writeheader( FILE *outptr, param *p );
 
 void
@@ -62,44 +63,22 @@ enum {
 	TYPE_MANUAL,
 	TYPE_UNPUBLISHED,
 	TYPE_ELECTRONIC,
-	TYPE_MISC
+	TYPE_MISC,
+	NUM_TYPES
 };
 
-static void
-output_citekey( FILE *fp, fields *info, unsigned long refnum, int format_opts )
-{
-	int n = fields_find( info, "REFNUM", -1 );
-	char *p;
-	if ( n!=-1 ) {
-		p = info->data[n].data;
-		while ( p && *p && *p!='|' ) {
-			if ( format_opts & BIBL_FORMAT_BIBOUT_STRICTKEY ) {
-				if ( isdigit((unsigned char)*p) || (*p>='A' && *p<='Z') ||
-				     (*p>='a' && *p<='z' ) )
-					fprintf( fp, "%c", *p );
-			}
-			else {
-				if ( *p!=' ' && *p!='\t' ) {
-					fprintf( fp, "%c", *p );
-				}
-			}
-			p++;
-		}
-	}
-}
-
 static int
-bibtexout_type( fields *info, char *filename, int refnum, param *p )
+bibtexout_type( fields *in, char *filename, int refnum, param *p )
 {
-	char *genre;
 	int type = TYPE_UNKNOWN, i, maxlevel, n, level;
+	char *tag, *genre;
 
 	/* determine bibliography type */
-	for ( i=0; i<info->n; ++i ) {
-		if ( strcasecmp( info->tag[i].data, "GENRE" ) &&
-		     strcasecmp( info->tag[i].data, "NGENRE" ) ) continue;
-		genre = info->data[i].data;
-		level = info->level[i];
+	for ( i=0; i<in->n; ++i ) {
+		tag = fields_tag( in, i, FIELDS_CHRP );
+		if ( strcasecmp( tag, "GENRE" ) && strcasecmp( tag, "NGENRE" ) ) continue;
+		genre = fields_value( in, i, FIELDS_CHRP );
+		level = in->level[i];
 		if ( !strcasecmp( genre, "periodical" ) ||
 		     !strcasecmp( genre, "academic journal" ) ||
 		     !strcasecmp( genre, "magazine" ) ||
@@ -133,26 +112,27 @@ bibtexout_type( fields *info, char *filename, int refnum, param *p )
 			type = TYPE_ELECTRONIC;
 	}
 	if ( type==TYPE_UNKNOWN ) {
-		for ( i=0; i<info->n; ++i ) {
-			if ( strcasecmp( info->tag[i].data, "ISSUANCE" ) ) continue;
-			if ( !strcasecmp( info->data[i].data, "monographic" ) ) {
-				if ( info->level[i]==0 ) type = TYPE_BOOK;
-				else if ( info->level[i]==1 ) type=TYPE_MISC;
+		for ( i=0; i<in->n; ++i ) {
+			tag = fields_tag( in, i, FIELDS_CHRP );
+			if ( strcasecmp( tag, "ISSUANCE" ) ) continue;
+			genre = fields_value( in, i, FIELDS_CHRP );
+			if ( !strcasecmp( genre, "monographic" ) ) {
+				if ( in->level[i]==0 ) type = TYPE_BOOK;
+				else if ( in->level[i]==1 ) type = TYPE_MISC;
 			}
 		}
 	}
 
-	/* default to BOOK type */
+	/* default to TYPE_MISC */
 	if ( type==TYPE_UNKNOWN ) {
-		maxlevel = fields_maxlevel( info );
+		maxlevel = fields_maxlevel( in );
 		if ( maxlevel > 0 ) type = TYPE_MISC;
 		else {
 			if ( p->progname ) fprintf( stderr, "%s: ", p->progname );
-			fprintf( stderr, "Cannot identify TYPE "
-				"in reference %d ", refnum+1 );
-			n = fields_find( info, "REFNUM", -1 );
+			fprintf( stderr, "Cannot identify TYPE in reference %d ", refnum+1 );
+			n = fields_find( in, "REFNUM", LEVEL_ANY );
 			if ( n!=-1 ) 
-				fprintf( stderr, " %s", info->data[n].data);
+				fprintf( stderr, " %s", (char*) fields_value( in, n, FIELDS_CHRP ) );
 			fprintf( stderr, " (defaulting to @Misc)\n" );
 			type = TYPE_MISC;
 		}
@@ -161,163 +141,234 @@ bibtexout_type( fields *info, char *filename, int refnum, param *p )
 }
 
 static void
-output_type( FILE *fp, int type, int format_opts )
+output( FILE *fp, fields *out, int format_opts )
 {
-	typedef struct {
-		int bib_type;
-		char *type_name;
-	} typenames;
+	int i, j, len, nquotes;
+	char *tag, *value, ch;
 
-	typenames types[] = {
-		{ TYPE_ARTICLE, "Article" },
-		{ TYPE_INBOOK, "Inbook" },
-		{ TYPE_PROCEEDINGS, "Proceedings" },
-		{ TYPE_INPROCEEDINGS, "InProceedings" },
-		{ TYPE_BOOK, "Book" },
-		{ TYPE_PHDTHESIS, "PhdThesis" },
-		{ TYPE_MASTERSTHESIS, "MastersThesis" },
-		{ TYPE_REPORT, "TechReport" },
-		{ TYPE_MANUAL, "Manual" },
-		{ TYPE_COLLECTION, "Collection" },
-		{ TYPE_INCOLLECTION, "InCollection" },
-		{ TYPE_UNPUBLISHED, "Unpublished" },
-		{ TYPE_ELECTRONIC, "Electronic" },
-		{ TYPE_MISC, "Misc" } };
-	int i, len, ntypes = sizeof( types ) / sizeof( types[0] );
-	char *s = NULL;
-	for ( i=0; i<ntypes; ++i ) {
-		if ( types[i].bib_type == type ) {
-			s = types[i].type_name;
-			break;
-		}
-	}
-	if ( !s ) s = types[ntypes-1].type_name; /* default to TYPE_MISC */
-	if ( !(format_opts & BIBL_FORMAT_BIBOUT_UPPERCASE ) ) fprintf( fp, "@%s{", s );
+	/* ...output type information "@article{" */
+	value = ( char * ) fields_value( out, 0, FIELDS_CHRP );
+	if ( !(format_opts & BIBL_FORMAT_BIBOUT_UPPERCASE) ) fprintf( fp, "@%s{", value );
 	else {
-		len = strlen( s );
+		len = strlen( value );
 		fprintf( fp, "@" );
 		for ( i=0; i<len; ++i )
-			fprintf( fp, "%c", toupper((unsigned char)s[i]) );
+			fprintf( fp, "%c", toupper((unsigned char)value[i]) );
 		fprintf( fp, "{" );
+	}
+
+	/* ...output refnum "Smith2001" */
+	value = ( char * ) fields_value( out, 1, FIELDS_CHRP );
+	fprintf( fp, "%s", value );
+
+	/* ...rest of the references */
+	for ( j=2; j<out->n; ++j ) {
+		nquotes = 0;
+		tag   = ( char * ) fields_tag( out, j, FIELDS_CHRP );
+		value = ( char * ) fields_value( out, j, FIELDS_CHRP );
+		fprintf( fp, ",\n" );
+		if ( format_opts & BIBL_FORMAT_BIBOUT_WHITESPACE ) fprintf( fp, "  " );
+		if ( !(format_opts & BIBL_FORMAT_BIBOUT_UPPERCASE ) ) fprintf( fp, "%s", tag );
+		else {
+			len = strlen( tag );
+			for ( i=0; i<len; ++i )
+				fprintf( fp, "%c", toupper((unsigned char)tag[i]) );
+		}
+		if ( format_opts & BIBL_FORMAT_BIBOUT_WHITESPACE ) fprintf( fp, " = \t" );
+		else fprintf( fp, "=" );
+
+		if ( format_opts & BIBL_FORMAT_BIBOUT_BRACKETS ) fprintf( fp, "{" );
+		else fprintf( fp, "\"" );
+
+		len = strlen( value );
+		for ( i=0; i<len; ++i ) {
+			ch = value[i];
+			if ( ch!='\"' ) fprintf( fp, "%c", ch );
+			else {
+				if ( format_opts & BIBL_FORMAT_BIBOUT_BRACKETS || ( i>0 && value[i-1]=='\\' ) )
+					fprintf( fp, "\"" );
+				else {
+					if ( nquotes % 2 == 0 )
+						fprintf( fp, "``" );
+					else    fprintf( fp, "\'\'" );
+					nquotes++;
+				}
+			}
+		}
+
+		if ( format_opts & BIBL_FORMAT_BIBOUT_BRACKETS ) fprintf( fp, "}" );
+		else fprintf( fp, "\"" );
+	}
+
+	/* ...finish reference */
+	if ( format_opts & BIBL_FORMAT_BIBOUT_FINALCOMMA ) fprintf( fp, "," );
+	fprintf( fp, "\n}\n\n" );
+
+	fflush( fp );
+}
+
+static void
+append_type( int type, fields *out, int *status )
+{
+	char *typenames[ NUM_TYPES ] = {
+		[ TYPE_ARTICLE       ] = "Article",
+		[ TYPE_INBOOK        ] = "Inbook",
+		[ TYPE_PROCEEDINGS   ] = "Proceedings",
+		[ TYPE_INPROCEEDINGS ] = "InProceedings",
+		[ TYPE_BOOK          ] = "Book",
+		[ TYPE_PHDTHESIS     ] = "PhdThesis",
+		[ TYPE_MASTERSTHESIS ] = "MastersThesis",
+		[ TYPE_REPORT        ] = "TechReport",
+		[ TYPE_MANUAL        ] = "Manual",
+		[ TYPE_COLLECTION    ] = "Collection",
+		[ TYPE_INCOLLECTION  ] = "InCollection",
+		[ TYPE_UNPUBLISHED   ] = "Unpublished",
+		[ TYPE_ELECTRONIC    ] = "Electronic",
+		[ TYPE_MISC          ] = "Misc",
+	};
+	int fstatus;
+	char *s;
+
+	if ( type < 0 || type >= NUM_TYPES ) type = TYPE_MISC;
+	s = typenames[ type ];
+
+	fstatus = fields_add( out, "TYPE", s, LEVEL_MAIN );
+	if ( fstatus!=FIELDS_OK ) *status = BIBL_ERR_MEMERR;
+}
+
+static void
+append_citekey( fields *in, fields *out, int format_opts, int *status )
+{
+	int n, fstatus;
+	newstr s;
+	char *p;
+
+	n = fields_find( in, "REFNUM", LEVEL_ANY );
+	if ( ( format_opts & BIBL_FORMAT_BIBOUT_DROPKEY ) || n==-1 ) {
+		fstatus = fields_add( out, "REFNUM", "", LEVEL_MAIN );
+		if ( fstatus!=FIELDS_OK ) *status = BIBL_ERR_MEMERR;
+	}
+
+	else {
+		newstr_init( &s );
+		p = fields_value( in, n, FIELDS_CHRP );
+		while ( p && *p && *p!='|' ) {
+			if ( format_opts & BIBL_FORMAT_BIBOUT_STRICTKEY ) {
+				if ( isdigit((unsigned char)*p) || (*p>='A' && *p<='Z') ||
+				     (*p>='a' && *p<='z' ) ) {
+					newstr_addchar( &s, *p );
+				}
+			}
+			else {
+				if ( *p!=' ' && *p!='\t' ) {
+					newstr_addchar( &s, *p );
+				}
+			}
+			p++;
+		}
+		fstatus = fields_add( out, "REFNUM", newstr_cstr( &s ), LEVEL_MAIN );
+		if ( fstatus!=FIELDS_OK ) *status = BIBL_ERR_MEMERR;
+		newstr_free( &s );
 	}
 }
 
 static void
-output_element( FILE *fp, char *tag, char *data, int format_opts )
+append_simple( fields *in, char *intag, char *outtag, fields *out, int *status )
 {
-	int i, len, nquotes = 0;
-	char ch;
-	fprintf( fp, ",\n" );
-	if ( format_opts & BIBL_FORMAT_BIBOUT_WHITESPACE ) fprintf( fp, "  " );
-	if ( !(format_opts & BIBL_FORMAT_BIBOUT_UPPERCASE ) ) fprintf( fp, "%s", tag );
-	else {
-		len = strlen( tag );
-		for ( i=0; i<len; ++i )
-			fprintf( fp, "%c", toupper((unsigned char)tag[i]) );
+	int n, fstatus;
+
+	n = fields_find( in, intag, LEVEL_ANY );
+	if ( n!=-1 ) {
+		fields_setused( in, n );
+		fstatus = fields_add( out, outtag, fields_value( in, n, FIELDS_CHRP ), LEVEL_MAIN );
+		if ( fstatus!=FIELDS_OK ) *status = BIBL_ERR_MEMERR;
 	}
-	if ( format_opts & BIBL_FORMAT_BIBOUT_WHITESPACE ) fprintf( fp, " = \t" );
-	else fprintf( fp, "=" );
+}
 
-	if ( format_opts & BIBL_FORMAT_BIBOUT_BRACKETS ) fprintf( fp, "{" );
-	else fprintf( fp, "\"" );
+static void
+append_simpleall( fields *in, char *intag, char *outtag, fields *out, int *status )
+{
+	int i, fstatus;
 
-	len = strlen( data );
-	for ( i=0; i<len; ++i ) {
-		ch = data[i];
-		if ( ch!='\"' ) fprintf( fp, "%c", ch );
-		else {
-			if ( format_opts & BIBL_FORMAT_BIBOUT_BRACKETS ||
-			    ( i>0 && data[i-1]=='\\' ) )
-				fprintf( fp, "\"" );
-			else {
-				if ( nquotes % 2 == 0 )
-					fprintf( fp, "``" );
-				else    fprintf( fp, "\'\'" );
-				nquotes++;
+	for ( i=0; i<in->n; ++i ) {
+		if ( fields_match_tag( in, i, intag ) ) {
+			fields_setused( in, i );
+			fstatus = fields_add( out, outtag, fields_value( in, i, FIELDS_CHRP ), LEVEL_MAIN );
+			if ( fstatus!=FIELDS_OK ) {
+				*status = BIBL_ERR_MEMERR;
+				return;
 			}
 		}
 	}
-
-	if ( format_opts & BIBL_FORMAT_BIBOUT_BRACKETS ) fprintf( fp, "}" );
-	else fprintf( fp, "\"" );
 }
 
 static void
-output_and_use( FILE *fp, fields *info, int n, char *outtag, int format_opts )
-{
-	output_element( fp, outtag, info->data[n].data, format_opts );
-	fields_setused( info, n );
-}
-
-static void
-output_simple( FILE *fp, fields *info, char *intag, char *outtag, 
-		int format_opts )
-{
-	int n = fields_find( info, intag, -1 );
-	if ( n!=-1 ) {
-		output_and_use( fp, info, n, outtag, format_opts );
-	}
-}
-
-static void
-output_simpleall( FILE *fp, fields *info, char *intag, char *outtag,
-		int format_opts )
-{
-	int i;
-	for ( i=0; i<info->n; ++i ) {
-		if ( fields_match_tag( info, i, intag ) )
-			output_and_use( fp, info, i, outtag, format_opts );
-	}
-}
-
-static void
-output_keywords( FILE *fp, fields *info, int format_opts )
+append_keywords( fields *in, fields *out, int *status )
 {
 	newstr keywords, *word;
+	int i, fstatus;
 	vplist a;
-	int i;
+
 	newstr_init( &keywords );
 	vplist_init( &a );
-	fields_findv_each( info, LEVEL_ANY, FIELDS_STRP, &a, "KEYWORD" );
+
+	fields_findv_each( in, LEVEL_ANY, FIELDS_STRP, &a, "KEYWORD" );
+
 	if ( a.n ) {
+
 		for ( i=0; i<a.n; ++i ) {
 			word = vplist_get( &a, i );
 			if ( i>0 ) newstr_strcat( &keywords, "; " );
 			newstr_newstrcat( &keywords, word );
 		}
-		output_element( fp, "keywords", keywords.data, format_opts );
+
+		fstatus = fields_add( out, "keywords", keywords.data, LEVEL_MAIN );
+		if ( fstatus!=FIELDS_OK ) {
+			*status = BIBL_ERR_MEMERR;
+			goto out;
+		}
+
 
 	}
+
+out:
 	newstr_free( &keywords );
 	vplist_free( &a );
 }
 
 static void
-output_fileattach( FILE *fp, fields *info, int format_opts )
+append_fileattach( fields *in, fields *out, int *status )
 {
+	int i, fstatus;
 	newstr data;
-	int i;
+	char *tag;
+
 	newstr_init( &data );
-	for ( i=0; i<info->n; ++i ) {
-		if ( strcasecmp( info->tag[i].data, "FILEATTACH" ) ) continue;
+	for ( i=0; i<in->n; ++i ) {
+		tag = fields_tag( in, i, FIELDS_CHRP );
+		if ( strcasecmp( tag, "FILEATTACH" ) ) continue;
 		newstr_strcpy( &data, ":" );
-		newstr_newstrcat( &data, &(info->data[i]) );
-		if ( strsearch( info->data[i].data, ".pdf" ) )
+		newstr_newstrcat( &data, &(in->data[i]) );
+		if ( strsearch( in->data[i].data, ".pdf" ) )
 			newstr_strcat( &data, ":PDF" );
-		else if ( strsearch( info->data[i].data, ".html" ) )
+		else if ( strsearch( in->data[i].data, ".html" ) )
 			newstr_strcat( &data, ":HTML" );
 		else newstr_strcat( &data, ":TYPE" );
-		output_element( fp, "file", data.data, format_opts );
-		fields_setused( info, i );
+		fields_setused( in, i );
+		fstatus = fields_add( out, "file", data.data, LEVEL_MAIN );
+		if ( fstatus!=FIELDS_OK ) {
+			*status = BIBL_ERR_MEMERR;
+			goto out;
+		}
 		newstr_empty( &data );
 	}
+out:
 	newstr_free( &data );
 }
 
 static void
-output_people( FILE *fp, fields *info, unsigned long refnum, char *tag, 
-		char *ctag, char *atag, char *bibtag, int level, 
-		int format_opts )
+append_people( fields *in, char *tag, char *ctag, char *atag,
+		char *bibtag, int level, fields *out, int format_opts )
 {
 	newstr allpeople, oneperson;
 	int i, npeople, person, corp, asis;
@@ -326,11 +377,11 @@ output_people( FILE *fp, fields *info, unsigned long refnum, char *tag,
 
 	/* primary citation authors */
 	npeople = 0;
-	for ( i=0; i<info->n; ++i ) {
-		if ( level!=-1 && info->level[i]!=level ) continue;
-		person = ( strcasecmp( info->tag[i].data, tag ) == 0 );
-		corp   = ( strcasecmp( info->tag[i].data, ctag ) == 0 );
-		asis   = ( strcasecmp( info->tag[i].data, atag ) == 0 );
+	for ( i=0; i<in->n; ++i ) {
+		if ( level!=LEVEL_ANY && in->level[i]!=level ) continue;
+		person = ( strcasecmp( in->tag[i].data, tag ) == 0 );
+		corp   = ( strcasecmp( in->tag[i].data, ctag ) == 0 );
+		asis   = ( strcasecmp( in->tag[i].data, atag ) == 0 );
 		if ( person || corp || asis ) {
 			if ( npeople>0 ) {
 				if ( format_opts & BIBL_FORMAT_BIBOUT_WHITESPACE )
@@ -339,62 +390,67 @@ output_people( FILE *fp, fields *info, unsigned long refnum, char *tag,
 			}
 			if ( corp ) {
 				newstr_addchar( &allpeople, '{' );
-				newstr_strcat( &allpeople, fields_value( info, i, FIELDS_CHRP ) );
+				newstr_strcat( &allpeople, fields_value( in, i, FIELDS_CHRP ) );
 				newstr_addchar( &allpeople, '}' );
 			} else if ( asis ) {
 				newstr_addchar( &allpeople, '{' );
-				newstr_strcat( &allpeople, fields_value( info, i, FIELDS_CHRP ) );
+				newstr_strcat( &allpeople, fields_value( in, i, FIELDS_CHRP ) );
 				newstr_addchar( &allpeople, '}' );
 			} else {
-				name_build_withcomma( &oneperson, fields_value( info, i, FIELDS_CHRP ) );
+				name_build_withcomma( &oneperson, fields_value( in, i, FIELDS_CHRP ) );
 				newstr_newstrcat( &allpeople, &oneperson );
 			}
 			npeople++;
 		}
 	}
-	if ( npeople )
-		output_element( fp, bibtag, allpeople.data, format_opts );
+	if ( npeople ) {
+		fields_add( out, bibtag, allpeople.data, LEVEL_MAIN );
+	}
 
 	newstrs_free( &allpeople, &oneperson, NULL );
 }
 
-static void
-output_title_chosen( FILE *fp, fields *info, char *bibtag, int format_opts, int n1, int n2 )
+static int
+append_title_chosen( fields *in, char *bibtag, fields *out, int nmainttl, int nsubttl )
 {
-	newstr title, *mainttl, *subttl;
+	newstr fulltitle, *mainttl = NULL, *subttl = NULL;
+	int status, ret = BIBL_OK;
 
-	if ( n1==-1 ) return;
+	newstr_init( &fulltitle );
 
-	newstr_init( &title );
-
-	mainttl = fields_value( info, n1, FIELDS_STRP );
-	newstr_newstrcpy( &title, mainttl );
-	fields_setused( info, n1 );
-	if ( n2!=-1 ) {
-		subttl = fields_value( info, n2, FIELDS_STRP );
-		if ( mainttl->len > 0 &&
-		     mainttl->data[mainttl->len-1]!='?' )
-			newstr_strcat( &title, ": " );
-		else newstr_addchar( &title, ' ' );
-		newstr_newstrcat( &title, subttl );
-		fields_setused( info, n2 );
+	if ( nmainttl!=-1 ) {
+		mainttl = fields_value( in, nmainttl, FIELDS_STRP );
+		fields_setused( in, nmainttl );
 	}
-	output_element( fp, bibtag, title.data, format_opts );
 
-	newstr_free( &title );
+	if ( nsubttl!=-1 ) {
+		subttl = fields_value( in, nsubttl, FIELDS_STRP );
+		fields_setused( in, nsubttl );
+	}
+
+	title_combine( &fulltitle, mainttl, subttl );
+
+	if ( fulltitle.len ) {
+		status = fields_add( out, bibtag, newstr_cstr( &fulltitle ), LEVEL_MAIN );
+		if ( status!=FIELDS_OK ) ret = BIBL_ERR_MEMERR;
+	}
+
+	newstr_free( &fulltitle );
+
+	return ret;
 }
 
-static void
-output_title( FILE *fp, fields *info, unsigned long refnum, char *bibtag, int level, int format_opts )
+static int
+append_title( fields *in, char *bibtag, int level, fields *out, int format_opts )
 {
-	int title = -1, short_title = -1;
-	int subtitle = -1, short_subtitle = -1;
+	int title = -1,     short_title = -1;
+	int subtitle = -1,  short_subtitle = -1;
 	int use_title = -1, use_subtitle = -1;
 
-	title          = fields_find( info, "TITLE",         level );
-	short_title    = fields_find( info, "SHORTTITLE",    level );
-	subtitle       = fields_find( info, "SUBTITLE",      level );
-	short_subtitle = fields_find( info, "SHORTSUBTITLE", level );
+	title          = fields_find( in, "TITLE",         level );
+	short_title    = fields_find( in, "SHORTTITLE",    level );
+	subtitle       = fields_find( in, "SUBTITLE",      level );
+	short_subtitle = fields_find( in, "SHORTSUBTITLE", level );
 
 	if ( title==-1 || ( ( format_opts & BIBL_FORMAT_BIBOUT_SHORTTITLE ) && level==1 ) ) {
 		use_title    = short_title;
@@ -406,149 +462,248 @@ output_title( FILE *fp, fields *info, unsigned long refnum, char *bibtag, int le
 		use_subtitle = subtitle;
 	}
 
-	output_title_chosen( fp, info, bibtag, format_opts, use_title, use_subtitle );
+	return append_title_chosen( in, bibtag, out, use_title, use_subtitle );
 }
 
 static void
-output_date( FILE *fp, fields *info, unsigned long refnum, int format_opts )
+append_titles( fields *in, int type, fields *out, int format_opts, int *status )
+{
+	/* item=main level title */
+	*status = append_title( in, "title", 0, out, format_opts );
+	if ( *status!=BIBL_OK ) return;
+
+	switch( type ) {
+
+		case TYPE_ARTICLE:
+		*status = append_title( in, "journal", 1, out, format_opts );
+		break;
+
+		case TYPE_INBOOK:
+		*status = append_title( in, "bookTitle", 1, out, format_opts );
+		if ( *status!=BIBL_OK ) return;
+		*status = append_title( in, "series",    2, out, format_opts );
+		break;
+
+		case TYPE_INCOLLECTION:
+		case TYPE_INPROCEEDINGS:
+		*status = append_title( in, "booktitle", 1, out, format_opts );
+		if ( *status!=BIBL_OK ) return;
+		*status = append_title( in, "series",    2, out, format_opts );
+		break;
+
+		case TYPE_PHDTHESIS:
+		case TYPE_MASTERSTHESIS:
+		*status = append_title( in, "series", 1, out, format_opts );
+		break;
+
+		case TYPE_BOOK:
+		case TYPE_REPORT:
+		case TYPE_COLLECTION:
+		case TYPE_PROCEEDINGS:
+		*status = append_title( in, "series", 1, out, format_opts );
+		if ( *status!=BIBL_OK ) return;
+		*status = append_title( in, "series", 2, out, format_opts );
+		break;
+
+		default:
+		/* do nothing */
+		break;
+
+	}
+}
+
+static int
+find_date( fields *in, char *date_element )
+{
+	char date[100], partdate[100];
+	int n;
+
+	sprintf( date, "DATE:%s", date_element );
+	n = fields_find( in, date, LEVEL_ANY );
+
+	if ( n==-1 ) {
+		sprintf( partdate, "PARTDATE:%s", date_element );
+		n = fields_find( in, partdate, LEVEL_ANY );
+	}
+
+	return n;
+}
+
+static void
+append_date( fields *in, fields *out, int *status )
 {
 	char *months[12] = { "Jan", "Feb", "Mar", "Apr", "May", "Jun", 
 		"Jul", "Aug", "Sep", "Oct", "Nov", "Dec" };
-	int n, month;
-	n = fields_find( info, "DATE:YEAR", -1 );
-	if ( n==-1 ) n = fields_find( info, "PARTDATE:YEAR", -1 );
+	int n, month, fstatus;
+
+	n = find_date( in, "YEAR" );
 	if ( n!=-1 ) {
-		output_element( fp, "year", info->data[n].data, format_opts );
-		fields_setused( info, n );
+		fields_setused( in, n );
+		fstatus = fields_add( out, "year", in->data[n].data, LEVEL_MAIN );
+		if ( fstatus!=FIELDS_OK ) {
+			*status = BIBL_ERR_MEMERR;
+			return;
+		}
 	}
-	n = fields_find( info, "DATE:MONTH", -1 );
-	if ( n==-1 ) n = fields_find( info, "PARTDATE:MONTH", -1 );
+
+	n = find_date( in, "MONTH" );
 	if ( n!=-1 ) {
-		month = atoi( info->data[n].data );
+		fields_setused( in, n );
+		month = atoi( in->data[n].data );
 		if ( month>0 && month<13 )
-			output_element( fp, "month", months[month-1], format_opts );
+			fstatus = fields_add( out, "month", months[month-1], LEVEL_MAIN );
 		else
-			output_element( fp, "month", info->data[n].data, format_opts );
-		fields_setused( info, n );
+			fstatus = fields_add( out, "month", in->data[n].data, LEVEL_MAIN );
+		if ( fstatus!=FIELDS_OK ) {
+			*status = BIBL_ERR_MEMERR;
+			return;
+		}
 	}
-	n = fields_find( info, "DATE:DAY", -1 );
-	if ( n==-1 ) n = fields_find( info, "PARTDATE:DAY", -1 );
+
+	n = find_date( in, "DAY" );
 	if ( n!=-1 ) {
-		output_element( fp, "day", info->data[n].data, format_opts );
-		fields_setused( info, n );
+		fields_setused( in, n );
+		fstatus = fields_add( out, "day", in->data[n].data, LEVEL_MAIN );
+		if ( fstatus!=FIELDS_OK ) {
+			*status = BIBL_ERR_MEMERR;
+			return;
+		}
 	}
-}
 
-
-/* output article number as pages if true pages aren't found */
-static void
-output_articlenumber( FILE *fp, fields *info, unsigned long refnum,
-	int format_opts )
-{
-	int ar = fields_find( info, "ARTICLENUMBER", -1 );
-	if ( ar!=-1 ) {
-		newstr pages;
-		newstr_init( &pages );
-		newstr_strcat( &pages, info->data[ar].data );
-		output_element( fp, "pages", pages.data, format_opts );
-		fields_setused( info, ar );
-		newstr_free( &pages );
-	}
 }
 
 static void
-output_arxiv( FILE *fp, fields *info, int format_opts )
+append_arxiv( fields *in, fields *out, int *status )
 {
-	int ar = fields_find( info, "ARXIV", -1 );
-	newstr arxiv;
+	int n, fstatus1, fstatus2;
+	newstr url;
 
-	if ( ar==-1 ) return;
+	n = fields_find( in, "ARXIV", LEVEL_ANY );
+	if ( n==-1 ) return;
+
+	fields_setused( in, n );
 
 	/* ...write:
 	 *     archivePrefix = "arXiv",
 	 *     eprint = "#####",
 	 * ...for people in high energy physics
 	 */
-	output_element( fp, "archivePrefix", "arXiv", format_opts );
-	output_element( fp, "eprint", info->data[ar].data, format_opts );
+	fstatus1 = fields_add( out, "archivePrefix", "arXiv", LEVEL_MAIN );
+	fstatus2 = fields_add( out, "eprint", fields_value( in, n, FIELDS_CHRP ), LEVEL_MAIN );
+	if ( fstatus1!=FIELDS_OK || fstatus2!=FIELDS_OK ) {
+		*status = BIBL_ERR_MEMERR;
+		return;
+	}
 
 	/* ...also write:
 	 *     url = "http://arxiv.org/abs/####",
 	 * ...to maximize compatibility
 	 */
-	newstr_init( &arxiv );
-	arxiv_to_url( info, ar, "URL", &arxiv );
-	if ( arxiv.len )
-		output_element( fp, "url", arxiv.data, format_opts );
-	newstr_free( &arxiv );
-}
-
-static void
-output_pmc( FILE *fp, fields *info, int format_opts )
-{
-	int pm = fields_find( info, "PMC", -1 );
-	if ( pm!=-1 ) {
-		newstr pmc;
-		newstr_init( &pmc );
-		pmc_to_url( info, pm, "URL", &pmc );
-		if ( pmc.len )
-			output_element( fp, "url", pmc.data, format_opts );
-		newstr_free( &pmc );
+	newstr_init( &url );
+	arxiv_to_url( in, n, "URL", &url );
+	if ( url.len ) {
+		fstatus1 = fields_add( out, "url", newstr_cstr( &url ), LEVEL_MAIN );
+		if ( fstatus1!=FIELDS_OK ) *status = BIBL_ERR_MEMERR;
 	}
+	newstr_free( &url );
 }
 
 static void
-output_pmid( FILE *fp, fields *info, int format_opts )
+append_pmc( fields *in, fields *out, int *status )
 {
-	int pm = fields_find( info, "PMID", -1 );
-	if ( pm!=-1 ) {
-		newstr pmid;
-		newstr_init( &pmid );
-		pmid_to_url( info, pm, "URL", &pmid );
-		if ( pmid.len )
-			output_element( fp, "url", pmid.data, format_opts );
-		newstr_free( &pmid );
+	int n, fstatus;
+	newstr url;
+
+	n = fields_find( in, "PMC", LEVEL_ANY);
+	if ( n==-1 ) return;
+
+	newstr_init( &url );
+	pmc_to_url( in, n, "URL", &url );
+	if ( url.len ) {
+		fstatus = fields_add( out, "url", newstr_cstr( &url ), LEVEL_MAIN );
+		if ( fstatus!=FIELDS_OK ) *status = BIBL_ERR_MEMERR;
 	}
+	newstr_free( &url );
 }
 
 static void
-output_jstor( FILE *fp, fields *info, int format_opts )
+append_pmid( fields *in, fields *out, int *status )
 {
-	int js = fields_find( info, "JSTOR", -1 );
-	if ( js!=-1 ) {
-		newstr jstor;
-		newstr_init( &jstor );
-		jstor_to_url( info, js, "URL", &jstor );
-		if ( jstor.len )
-			output_element( fp, "url", jstor.data, format_opts );
-		newstr_free( &jstor );
+	int n, fstatus;
+	newstr url;
+
+	n = fields_find( in, "PMID", LEVEL_ANY );
+	if ( n==-1 ) return;
+
+	newstr_init( &url );
+	pmid_to_url( in, n, "URL", &url );
+	if ( url.len ) {
+		fstatus = fields_add( out, "url", newstr_cstr( &url ), LEVEL_MAIN );
+		if ( fstatus!=FIELDS_OK ) *status = BIBL_ERR_MEMERR;
 	}
+	newstr_free( &url );
 }
 
 static void
-output_isi( FILE *fp, fields *info, int format_opts )
+append_jstor( fields *in, fields *out, int *status )
 {
-	int n = fields_find( info, "ISIREFNUM", -1 );
+	int n, fstatus;
+	newstr url;
+
+	n = fields_find( in, "JSTOR", LEVEL_ANY );
+	if ( n==-1 ) return;
+
+	newstr_init( &url );
+	jstor_to_url( in, n, "URL", &url );
+	if ( url.len ) {
+		fstatus = fields_add( out, "url", newstr_cstr( &url ), LEVEL_MAIN );
+		if ( fstatus!=FIELDS_OK ) *status = BIBL_ERR_MEMERR;
+	}
+	newstr_free( &url );
+}
+
+static void
+append_isi( fields *in, fields *out, int *status )
+{
+	int n, fstatus;
+
+	n = fields_find( in, "ISIREFNUM", LEVEL_ANY );
 	if ( n!=-1 ) {
-		output_element( fp, "note", fields_value( info, n, FIELDS_CHRP ), format_opts );
+		fstatus = fields_add( out, "note", fields_value( in, n, FIELDS_CHRP ), LEVEL_MAIN );
+		if ( fstatus!=FIELDS_OK ) *status = BIBL_ERR_MEMERR;
 	}
 }
 
-static void
-output_pages( FILE *fp, fields *info, unsigned long refnum, int format_opts )
+static int
+append_articlenumber( fields *in, fields *out )
 {
+	int n, fstatus;
+
+	n = fields_find( in, "ARTICLENUMBER", LEVEL_ANY );
+	if ( n==-1 ) return BIBL_OK;
+
+	fields_setused( in, n );
+	fstatus = fields_add( out, "pages", fields_value( in, n, FIELDS_CHRP ), LEVEL_MAIN );
+	if ( fstatus!=FIELDS_OK ) return BIBL_ERR_MEMERR;
+	return BIBL_OK;
+}
+
+static void
+append_pages( fields *in, fields *out, int format_opts, int *status )
+{
+	int sn, en, fstatus;
 	newstr pages;
-	int sn, en;
-	sn = fields_find( info, "PAGES:START", -1 );
-	en = fields_find( info, "PAGES:STOP", -1 );
+
+	sn = fields_find( in, "PAGES:START", LEVEL_ANY );
+	en = fields_find( in, "PAGES:STOP",  LEVEL_ANY );
 	if ( sn==-1 && en==-1 ) {
-		output_articlenumber( fp, info, refnum, format_opts );
+		*status = append_articlenumber( in, out );
 		return;
 	}
 	newstr_init( &pages );
 	if ( sn!=-1 ) {
-		newstr_strcat( &pages, info->data[sn].data );
-		fields_setused( info, sn );
+		newstr_newstrcat( &pages, fields_value( in, sn, FIELDS_STRP ) );
+		fields_setused( in, sn );
 	}
 	if ( sn!=-1 && en!=-1 ) {
 		if ( format_opts & BIBL_FORMAT_BIBOUT_SINGLEDASH )
@@ -557,10 +712,11 @@ output_pages( FILE *fp, fields *info, unsigned long refnum, int format_opts )
 			newstr_strcat( &pages, "--" );
 	}
 	if ( en!=-1 ) {
-		newstr_strcat( &pages, info->data[en].data );
-		fields_setused( info, en );
+		newstr_newstrcat( &pages, fields_value( in, en, FIELDS_STRP ) );
+		fields_setused( in, en );
 	}
-	output_element( fp, "pages", pages.data, format_opts );
+	fstatus = fields_add( out, "pages", newstr_cstr( &pages ), LEVEL_MAIN );
+	if ( fstatus!=FIELDS_OK ) *status = BIBL_ERR_MEMERR;
 	newstr_free( &pages );
 }
 
@@ -577,104 +733,92 @@ output_pages( FILE *fp, fields *info, unsigned long refnum, int format_opts )
  */
 
 static void
-output_issue_number( FILE *fp, fields *info, int format_opts )
+append_issue_number( fields *in, fields *out, int *status )
 {
-	int nissue  = fields_find( info, "ISSUE", -1 );
-	int nnumber = fields_find( info, "NUMBER", -1 );
+	int nissue  = fields_find( in, "ISSUE",  LEVEL_ANY );
+	int nnumber = fields_find( in, "NUMBER", LEVEL_ANY );
+	int fstatus;
+
 	if ( nissue!=-1 && nnumber!=-1 ) {
-		output_and_use( fp, info, nissue,  "issue",  format_opts );
-		output_and_use( fp, info, nnumber, "number", format_opts );
-/*		output_element( fp, "issue", info->data[nissue].data, 
-				format_opts );
-		fields_setused( info, nissue );
-		output_element( fp, "number", info->data[nnumber].data, 
-				format_opts );
-		fields_setused( info, nnumber );*/
+		fields_setused( in, nissue );
+		fields_setused( in, nnumber );
+		fstatus = fields_add( out, "issue", fields_value( in, nissue, FIELDS_CHRP ), LEVEL_MAIN );
+		if ( fstatus!=FIELDS_OK ) {
+			*status = BIBL_ERR_MEMERR;
+			return;
+		}
+		fstatus = fields_add( out, "number", fields_value( in, nnumber, FIELDS_CHRP ), LEVEL_MAIN );
+		if ( fstatus!=FIELDS_OK ) *status = BIBL_ERR_MEMERR;
 	} else if ( nissue!=-1 ) {
-		output_and_use( fp, info, nissue, "number", format_opts );
-/*
-		output_element( fp, "number", info->data[nissue].data, 
-				format_opts );
-		fields_setused( info, nissue );*/
+		fields_setused( in, nissue );
+		fstatus = fields_add( out, "number", fields_value( in, nissue, FIELDS_CHRP ), LEVEL_MAIN );
+		if ( fstatus!=FIELDS_OK ) *status = BIBL_ERR_MEMERR;
 	} else if ( nnumber!=-1 ) {
-		output_and_use( fp, info, nnumber, "number", format_opts );
-/*
-		output_element( fp, "number", info->data[nnumber].data, 
-				format_opts );
-		fields_setused( info, nnumber );
-*/
+		fields_setused( in, nnumber );
+		fstatus = fields_add( out, "number", fields_value( in, nnumber, FIELDS_CHRP ), LEVEL_MAIN );
+		if ( fstatus!=FIELDS_OK ) *status = BIBL_ERR_MEMERR;
 	}
 }
 
-static void
-bibtexout_write( fields *info, FILE *fp, param *p, unsigned long refnum )
+static int
+append_data( fields *in, fields *out, param *p, unsigned long refnum )
 {
-	int type;
-	fields_clearused( info );
-	type = bibtexout_type( info, "", refnum, p );
-	output_type( fp, type, p->format_opts );
-	if ( !( p->format_opts & BIBL_FORMAT_BIBOUT_DROPKEY ) )
-		output_citekey( fp, info, refnum, p->format_opts );
-	output_people( fp, info, refnum, "AUTHOR", "AUTHOR:CORP", "AUTHOR:ASIS", "author", 0,
-		p->format_opts );
-	output_people( fp, info, refnum, "EDITOR", "EDITOR:CORP", "EDITOR:ASIS", "editor", -1,
-		p->format_opts );
-	output_people( fp, info, refnum, "TRANSLATOR", "TRANSLATOR:CORP", "TRANSLATOR:ASIS", "translator", -1, p->format_opts );
+	int type, status = BIBL_OK;
 
-	/* item=main level title */
-	output_title( fp, info, refnum, "title", 0, p->format_opts );
+	type = bibtexout_type( in, "", refnum, p );
 
-	/* item=host level title */
-	if ( type==TYPE_ARTICLE )
-		output_title( fp, info, refnum, "journal", 1, p->format_opts );
-	else if ( type==TYPE_INBOOK ) {
-		output_title( fp, info, refnum, "bookTitle", 1, p->format_opts );
-		output_title( fp, info, refnum, "series", 2, p->format_opts );
-	}
-	else if ( type==TYPE_INPROCEEDINGS || type==TYPE_INCOLLECTION ) {
-		output_title( fp, info, refnum, "booktitle", 1, p->format_opts );
-		output_title( fp, info, refnum, "series", 2, p->format_opts );
-	}
-	else if ( type==TYPE_PHDTHESIS || type==TYPE_MASTERSTHESIS ) {
-		output_title( fp, info, refnum, "series", 1, p->format_opts );
-	}
-	else if ( type==TYPE_BOOK || type==TYPE_COLLECTION || type==TYPE_PROCEEDINGS || type==TYPE_REPORT ) {
-		output_title( fp, info, refnum, "series", 1, p->format_opts );
-		output_title( fp, info, refnum, "series", 2, p->format_opts );
-	}
+	append_type        ( type, out, &status );
+	append_citekey     ( in, out, p->format_opts, &status );
+	append_people      ( in, "AUTHOR",     "AUTHOR:CORP",     "AUTHOR:ASIS",     "author", 0, out, p->format_opts );
+	append_people      ( in, "EDITOR",     "EDITOR:CORP",     "EDITOR:ASIS",     "editor", -1, out, p->format_opts );
+	append_people      ( in, "TRANSLATOR", "TRANSLATOR:CORP", "TRANSLATOR:ASIS", "translator", -1, out, p->format_opts );
+	append_titles      ( in, type, out, p->format_opts, &status );
+	append_date        ( in, out, &status );
+	append_simple      ( in, "EDITION",            "edition",   out, &status );
+	append_simple      ( in, "PUBLISHER",          "publisher", out, &status );
+	append_simple      ( in, "ADDRESS",            "address",   out, &status );
+	append_simple      ( in, "VOLUME",             "volume",    out, &status );
+	append_issue_number( in, out, &status );
+	append_pages       ( in, out, p->format_opts, &status );
+	append_keywords    ( in, out, &status );
+	append_simple      ( in, "CONTENTS",           "contents",  out, &status );
+	append_simple      ( in, "ABSTRACT",           "abstract",  out, &status );
+	append_simple      ( in, "LOCATION",           "location",  out, &status );
+	append_simple      ( in, "DEGREEGRANTOR",      "school",    out, &status );
+	append_simple      ( in, "DEGREEGRANTOR:ASIS", "school",    out, &status );
+	append_simple      ( in, "DEGREEGRANTOR:CORP", "school",    out, &status );
+	append_simpleall   ( in, "NOTES",              "note",      out, &status );
+	append_simpleall   ( in, "ANNOTE",             "annote",    out, &status );
+	append_simple      ( in, "ISBN",               "isbn",      out, &status );
+	append_simple      ( in, "ISSN",               "issn",      out, &status );
+	append_simple      ( in, "CODEN",              "coden",     out, &status );
+	append_simple      ( in, "DOI",                "doi",       out, &status );
+	append_simpleall   ( in, "URL",                "url",       out, &status );
+	append_fileattach  ( in, out, &status );
+	append_arxiv       ( in, out, &status );
+	append_pmid        ( in, out, &status );
+	append_pmc         ( in, out, &status );
+	append_jstor       ( in, out, &status );
+	append_isi         ( in, out, &status );
+	append_simple      ( in, "LANGUAGE",           "language",  out, &status );
 
-	output_date( fp, info, refnum, p->format_opts );
-	output_simple( fp, info, "EDITION", "edition", p->format_opts );
-	output_simple( fp, info, "PUBLISHER", "publisher", p->format_opts );
-	output_simple( fp, info, "ADDRESS", "address", p->format_opts );
-	output_simple( fp, info, "VOLUME", "volume", p->format_opts );
-	output_issue_number( fp, info, p->format_opts );
-/*	output_simple( fp, info, "ISSUE", "issue", p->format_opts );
-	output_simple( fp, info, "NUMBER", "number", p->format_opts );s*/
-	output_pages( fp, info, refnum, p->format_opts );
-	output_keywords( fp, info, p->format_opts );
-	output_simple( fp, info, "CONTENTS", "contents", p->format_opts );
-	output_simple( fp, info, "ABSTRACT", "abstract", p->format_opts );
-	output_simple( fp, info, "LOCATION", "location", p->format_opts );
-	output_simple( fp, info, "DEGREEGRANTOR", "school", p->format_opts );
-	output_simple( fp, info, "DEGREEGRANTOR:ASIS", "school", p->format_opts );
-	output_simple( fp, info, "DEGREEGRANTOR:CORP", "school", p->format_opts );
-	output_simpleall( fp, info, "NOTES", "note", p->format_opts );
-	output_simpleall( fp, info, "ANNOTE", "annote", p->format_opts );
-	output_simple( fp, info, "ISBN", "isbn", p->format_opts );
-	output_simple( fp, info, "ISSN", "issn", p->format_opts );
-	output_simple( fp, info, "DOI", "doi", p->format_opts );
-	output_simpleall( fp, info, "URL", "url", p->format_opts );
-	output_fileattach( fp, info, p->format_opts );
-	output_arxiv( fp, info, p->format_opts );
-	output_pmid( fp, info, p->format_opts );
-	output_pmc( fp, info, p->format_opts );
-	output_jstor( fp, info, p->format_opts );
-	output_isi( fp, info, p->format_opts );
-	output_simple( fp, info, "LANGUAGE", "language", p->format_opts );
-	if ( p->format_opts & BIBL_FORMAT_BIBOUT_FINALCOMMA ) fprintf( fp, "," );
-	fprintf( fp, "\n}\n\n" );
-	fflush( fp );
+	return status;
+}
+
+static int
+bibtexout_write( fields *in, FILE *fp, param *p, unsigned long refnum )
+{
+	int status;
+	fields out;
+
+	fields_init( &out );
+
+	status = append_data( in, &out, p, refnum );
+	if ( status==BIBL_OK ) output( fp, &out, p->format_opts );
+
+	fields_free( &out );
+
+	return status;
 }
 
 static void

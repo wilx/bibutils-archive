@@ -926,6 +926,7 @@ modsin_identifier( xml *node, fields *info, int level )
 	convert ids[] = {
 		{ "citekey",       "REFNUM",      0, 0 },
 		{ "issn",          "ISSN",        0, 0 },
+		{ "coden",         "CODEN",       0, 0 },
 		{ "isbn",          "ISBN",        0, 0 },
 		{ "doi",           "DOI",         0, 0 },
 		{ "url",           "URL",         0, 0 },
@@ -935,6 +936,7 @@ modsin_identifier( xml *node, fields *info, int level )
 		{ "medline",       "MEDLINE",     0, 0 },
 		{ "pmc",           "PMC",         0, 0 },
 		{ "arXiv",         "ARXIV",       0, 0 },
+		{ "MRnumber",      "MRNUMBER",    0, 0 },
 		{ "pii",           "PII",         0, 0 },
 		{ "isi",           "ISIREFNUM",   0, 0 },
 		{ "serial number", "SERIALNUMBER",0, 0 },

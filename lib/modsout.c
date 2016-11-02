@@ -23,7 +23,7 @@
 
 static void modsout_writeheader( FILE *outptr, param *p );
 static void modsout_writefooter( FILE *outptr );
-static void modsout_write( fields *info, FILE *outptr, param *p, unsigned long numrefs );
+static int  modsout_write( fields *info, FILE *outptr, param *p, unsigned long numrefs );
 
 void
 modsout_initparams( param *p, const char *progname )
@@ -874,12 +874,14 @@ output_sn( fields *f, FILE *outptr, int level )
 		{ "isbn",      "ISBN13",    0, 0 },
 		{ "lccn",      "LCCN",      0, 0 },
 		{ "issn",      "ISSN",      0, 0 },
+		{ "coden",     "CODEN",     0, 0 },
 		{ "citekey",   "REFNUM",    0, 0 },
 		{ "doi",       "DOI",       0, 0 },
 		{ "eid",       "EID",       0, 0 },
 		{ "eprint",    "EPRINT",    0, 0 },
 		{ "eprinttype","EPRINTTYPE",0, 0 },
 		{ "pubmed",    "PMID",      0, 0 },
+		{ "MRnumber",  "MRNUMBER",  0, 0 },
 		{ "medline",   "MEDLINE",   0, 0 },
 		{ "pii",       "PII",       0, 0 },
 		{ "pmc",       "PMC",       0, 0 },
@@ -1096,7 +1098,7 @@ modsout_report_unused_tags( fields *f, param *p, unsigned long numrefs )
 	}
 }
 
-static void
+static int
 modsout_write( fields *f, FILE *outptr, param *p, unsigned long numrefs )
 {
 	int max, dropkey;
@@ -1109,6 +1111,8 @@ modsout_write( fields *f, FILE *outptr, param *p, unsigned long numrefs )
 
 	fprintf( outptr, "</mods>\n" );
 	fflush( outptr );
+
+	return BIBL_OK;
 }
 
 static void

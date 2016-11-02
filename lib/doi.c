@@ -22,13 +22,15 @@
 #include "fields.h"
 
 static void
-construct_url( char *prefix, newstr *id, newstr *id_url )
+construct_url( char *prefix, newstr *id, newstr *id_url, char sep )
 {
 	if ( !strncasecmp( id->data, "http:", 5 ) )
 		newstr_newstrcpy( id_url, id );
 	else {
 		newstr_strcpy( id_url, prefix );
-		if ( id->data[0]!='/' ) newstr_addchar( id_url, '/' );
+		if ( sep!='\0' ) {
+			if ( id->data[0]!=sep ) newstr_addchar( id_url, sep );
+		}
 		newstr_newstrcat( id_url, id );
 	}
 }
@@ -49,37 +51,42 @@ url_exists( fields *f, char *urltag, newstr *doi_url )
 }
 
 static void
-xxx_to_url( fields *f, int n, char *http_prefix, char *urltag, newstr *xxx_url )
+xxx_to_url( fields *f, int n, char *http_prefix, char *urltag, newstr *xxx_url, char sep )
 {
 	newstr_empty( xxx_url );
-	construct_url( http_prefix, fields_value( f, n, FIELDS_STRP ), xxx_url );
+	construct_url( http_prefix, fields_value( f, n, FIELDS_STRP ), xxx_url, sep );
 	if ( url_exists( f, urltag, xxx_url ) )
 		newstr_empty( xxx_url );
 }
 void
 doi_to_url( fields *f, int n, char *urltag, newstr *url )
 {
-	xxx_to_url( f, n, "http://dx.doi.org", urltag, url );
+	xxx_to_url( f, n, "http://dx.doi.org", urltag, url, '/' );
 }
 void
 jstor_to_url( fields *f, int n, char *urltag, newstr *url )
 {
-	xxx_to_url( f, n, "http://www.jstor.org/stable", urltag, url );
+	xxx_to_url( f, n, "http://www.jstor.org/stable", urltag, url, '/' );
 }
 void
 pmid_to_url( fields *f, int n, char *urltag, newstr *url )
 {
-	xxx_to_url( f, n, "http://www.ncbi.nlm.nih.gov/pubmed", urltag, url );
+	xxx_to_url( f, n, "http://www.ncbi.nlm.nih.gov/pubmed", urltag, url, '/' );
 }
 void
 pmc_to_url( fields *f, int n, char *urltag, newstr *url )
 {
-	xxx_to_url( f, n, "http://www.ncbi.nlm.nih.gov/pmc/articles", urltag, url );
+	xxx_to_url( f, n, "http://www.ncbi.nlm.nih.gov/pmc/articles", urltag, url, '/' );
 }
 void
 arxiv_to_url( fields *f, int n, char *urltag, newstr *url )
 {
-	xxx_to_url( f, n, "http://arxiv.org/abs", urltag, url );
+	xxx_to_url( f, n, "http://arxiv.org/abs", urltag, url, '/' );
+}
+void
+mrnumber_to_url( fields *f, int n, char *urltag, newstr *url )
+{
+	xxx_to_url( f, n, "http://www.ams.org/mathscinet-getitem?mr=", urltag, url, '\0' );
 }
 
 /* Rules for the pattern:

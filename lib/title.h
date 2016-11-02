@@ -14,7 +14,7 @@
 #include "newstr.h"
 #include "fields.h"
 
-extern int title_process( fields *info, char *tag, char *data, int level,
-		unsigned char nosplittitle );
+int  title_process( fields *info, char *tag, char *data, int level, unsigned char nosplittitle );
+void title_combine( newstr *fullttl, newstr *mainttl, newstr *subttl );
 
 #endif

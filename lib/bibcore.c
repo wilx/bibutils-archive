@@ -947,14 +947,16 @@ singlerefname( fields *reffields, long nref, int mode )
 static int
 bibl_writeeachfp( FILE *fp, bibl *b, param *p )
 {
+	int status;
 	long i;
 	for ( i=0; i<b->nrefs; ++i ) {
 		fp = singlerefname( b->ref[i], i, p->writeformat );
 		if ( !fp ) return BIBL_ERR_CANTOPEN;
 		if ( p->headerf ) p->headerf( fp, p );
-		p->writef( b->ref[i], fp, p, i );
+		status = p->writef( b->ref[i], fp, p, i );
 		if ( p->footerf ) p->footerf( fp );
 		fclose( fp );
+		if ( status!=BIBL_OK ) return status;
 	}
 	return BIBL_OK;
 }
@@ -962,12 +964,15 @@ bibl_writeeachfp( FILE *fp, bibl *b, param *p )
 static int
 bibl_writefp( FILE *fp, bibl *b, param *p )
 {
+	int status = BIBL_OK;
 	long i;
 	if ( p->headerf ) p->headerf( fp, p );
-	for ( i=0; i<b->nrefs; ++i )
-		p->writef( b->ref[i], fp, p, i );
+	for ( i=0; i<b->nrefs; ++i ) {
+		status = p->writef( b->ref[i], fp, p, i );
+		if ( status!=BIBL_OK ) break;
+	}
 	if ( p->footerf ) p->footerf( fp );
-	return BIBL_OK;
+	return status;
 }
 
 int

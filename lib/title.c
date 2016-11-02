@@ -66,3 +66,35 @@ title_process( fields *info, char *tag, char *data, int level,
 	return 1;
 }
 
+/* title_combine()
+ *
+ * Combine a main title and a subtitle into a full title.
+ *
+ * Example:
+ * 	Main title = "A Clearing in the Distance"
+ * 	Subtitle   = "The Biography of Frederick Law Olmstead"
+ * 	Full title = "A Clearing in the Distance: The Biography of Frederick Law Olmstead"
+ * Example:
+ *	Main title = "What Makes a Good Team Player?"
+ *	Subtitle   = "Personality and Team Effectiveness"
+ *	Full title = "What Makes a Good Team Player? Personality and Team Effectiveness"
+ */
+void
+title_combine( newstr *fullttl, newstr *mainttl, newstr *subttl )
+{
+	newstr_empty( fullttl );
+
+	if ( !mainttl ) return;
+
+	newstr_newstrcpy( fullttl, mainttl );
+
+	if ( subttl ) {
+		if ( mainttl->len > 0 ) {
+			if ( mainttl->data[ mainttl->len - 1 ] != '?' )
+				newstr_strcat( fullttl, ": " );
+			else
+				newstr_strcat( fullttl, " " );
+		}
+		newstr_newstrcat( fullttl, subttl );
+	}
+}

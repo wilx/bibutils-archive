@@ -32,6 +32,8 @@ void     newstrs_init     ( newstr *s, ... );
 void     newstrs_empty    ( newstr *s, ... );
 void     newstrs_free     ( newstr *s, ... );
 
+char *   newstr_cstr      ( newstr *s );
+
 void     newstr_mergestrs ( newstr *s, ... );
 void     newstr_fill      ( newstr *s, unsigned long n, char fillchar );
 void     newstr_addchar   ( newstr *s, char newchar );

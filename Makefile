@@ -1,18 +1,18 @@
-CC            = REPLACE_CC
-EXEEXT        = REPLACE_EXEEXT
-LIBTARGET     = REPLACE_LIBTARGET
-LIBEXT        = REPLACE_LIBEXT
-CFLAGS        = REPLACE_CFLAGS
-CLIBFLAGS     = REPLACE_CLIBFLAGS
-RANLIB        = REPLACE_RANLIB
-POSTFIX       = REPLACE_POSTFIX
-INSTALLDIR    = REPLACE_INSTALLDIR
-LIBINSTALLDIR = REPLACE_LIBINSTALLDIR
+CC            = cc
+EXEEXT        = 
+LIBTARGET     = libbibutils.a
+LIBEXT        = .a
+CFLAGS        = -Wall
+CLIBFLAGS     = -Wall
+RANLIB        = ranlib
+POSTFIX       = _amd64
+INSTALLDIR    = /usr/local/bin
+LIBINSTALLDIR = /usr/local/lib
 
 MAJORVERSION  = 5
-MINORVERSION  = 10
+MINORVERSION  = 9
 VERSION       = $(MAJORVERSION).$(MINORVERSION)
-DATE          = 2016-11-02
+DATE          = 2016-09-12
 
 PROGRAMS      = bib2xml \
                 biblatex2xml \

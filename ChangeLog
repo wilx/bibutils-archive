@@ -1,6 +1,12 @@
 
 BIBUTILS
 
+5.10
+11/2/16
+
+BIBTEXIN
++ Handle MRNUMBER and CODEN tags
+
 5.9
 9/12/16
 

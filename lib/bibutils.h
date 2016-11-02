@@ -117,7 +117,7 @@ typedef struct param {
         int  (*convertf)(fields*,fields*,int,struct param*);
         void (*headerf)(FILE*,struct param*);
         void (*footerf)(FILE*);
-        void (*writef)(fields*,FILE*,struct param*,unsigned long);
+        int  (*writef)(fields*,FILE*,struct param*,unsigned long);
         variants *all;
         int  nall;
 

@@ -18,7 +18,7 @@
 
 static void wordout_writeheader( FILE *outptr, param *p );
 static void wordout_writefooter( FILE *outptr );
-static void wordout_write( fields *info, FILE *outptr, param *p, unsigned long numrefs );
+static int  wordout_write( fields *info, FILE *outptr, param *p, unsigned long numrefs );
 
 void
 wordout_initparams( param *p, const char *progname )
@@ -613,6 +613,7 @@ output_citeparts( fields *info, FILE *outptr, int level, int max, int type )
 		{ "PMID",            "b:Url",     "http://www.ncbi.nlm.nih.gov/pubmed/", LEVEL_ANY },
 		{ "PMC",             "b:Url",     "http://www.ncbi.nlm.nih.gov/pmc/articles/", LEVEL_ANY },
 		{ "DOI",             "b:Url",     "http://dx.doi.org/", LEVEL_ANY },
+		{ "MRNUMBER",        "b:Url",     "http://www.ams.org/mathscinet-getitem?mr=", LEVEL_ANY },
 	};
 	int nparts=sizeof(parts)/sizeof(convert);
 	
@@ -628,7 +629,7 @@ output_citeparts( fields *info, FILE *outptr, int level, int max, int type )
 	output_comments( info, outptr, level );
 }
 
-static void
+static int
 wordout_write( fields *info, FILE *outptr, param *p, unsigned long numrefs )
 {
 	int max = fields_maxlevel( info );
@@ -639,6 +640,8 @@ wordout_write( fields *info, FILE *outptr, param *p, unsigned long numrefs )
 	fprintf( outptr, "</b:Source>\n" );
 
 	fflush( outptr );
+
+	return BIBL_OK;
 }
 
 static void

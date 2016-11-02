@@ -228,6 +228,13 @@ newstrs_empty( newstr *s, ... )
 	va_end( ap );
 }
 
+char *
+newstr_cstr( newstr *s )
+{
+	assert( s );
+	return s->data;
+}
+
 void
 newstr_addchar( newstr *s, char newchar )
 {
