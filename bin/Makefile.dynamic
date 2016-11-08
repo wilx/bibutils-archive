@@ -19,6 +19,7 @@ ENDXIN     = endx2xml.o
 ISIIN      = isi2xml.o
 MEDIN      = med2xml.o
 MODSCLEAN  = modsclean.o
+NBIBIN     = nbib2xml.o
 RISIN      = ris2xml.o
 WORDIN     = wordbib2xml.o
 
@@ -32,7 +33,7 @@ RISOUT     = xml2ris.o
 WORDOUT    = xml2wordbib.o
 
 PROGS      = bib2xml biblatex2xml copac2xml end2xml endx2xml isi2xml med2xml \
-             ris2xml ebi2xml wordbib2xml \
+             nbib2xml ris2xml ebi2xml wordbib2xml \
              xml2ads xml2bib xml2end xml2isi xml2ris xml2wordbib modsclean
 
 all: $(PROGS)
@@ -62,6 +63,9 @@ isi2xml : $(TOMODS) $(ISIIN)
 	$(CC) $(LDFLAGS) $^ $(LOADLIBES) $(LDLIBS) -o $@
 
 med2xml : $(TOMODS) $(MEDIN)
+	$(CC) $(LDFLAGS) $^ $(LOADLIBES) $(LDLIBS) -o $@
+
+nbib2xml : $(TOMODS) $(NBIBIN)
 	$(CC) $(LDFLAGS) $^ $(LOADLIBES) $(LDLIBS) -o $@
 
 ris2xml : $(TOMODS) $(RISIN)

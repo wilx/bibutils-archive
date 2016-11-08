@@ -15,6 +15,7 @@ ENDXIN     = endx2xml.o ../lib/endxmlin.o ../lib/endin.o ../lib/endtypes.o ../li
 ISIIN      = isi2xml.o ../lib/isiin.o ../lib/isitypes.o ../lib/generic.o
 MEDIN      = med2xml.o ../lib/medin.o
 MODSCLEAN  = modsclean.o ../lib/modsin.o
+NBIBIN     = nbib2xml.o ../lib/nbibin.o ../lib/nbibtypes.o ../lib/generic.o
 RISIN      = ris2xml.o ../lib/risin.o ../lib/ristypes.o ../lib/generic.o
 WORDIN     = wordbib2xml.o ../lib/wordin.o
 
@@ -59,6 +60,9 @@ med2xml : $(TOMODS) $(MEDIN) ../lib/libbibcore.a
 	$(CC) $(LDFLAGS) $^ $(LOADLIBES) $(LDLIBS) -o $@
 
 ris2xml : $(TOMODS) $(RISIN) ../lib/libbibcore.a
+	$(CC) $(LDFLAGS) $^ $(LOADLIBES) $(LDLIBS) -o $@
+
+nbib2xml : $(TOMODS) $(NBIBIN) ../lib/libbibcore.a
 	$(CC) $(LDFLAGS) $^ $(LOADLIBES) $(LDLIBS) -o $@
 
 wordbib2xml : $(TOMODS) $(WORDIN) ../lib/libbibcore.a

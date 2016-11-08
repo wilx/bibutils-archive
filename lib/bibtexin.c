@@ -13,12 +13,12 @@
 #include "is_ws.h"
 #include "newstr.h"
 #include "utf8.h"
-#include "doi.h"
 #include "newstr_conv.h"
 #include "fields.h"
 #include "list.h"
 #include "name.h"
 #include "title.h"
+#include "url.h"
 #include "reftypes.h"
 #include "bibformats.h"
 #include "generic.h"
@@ -819,19 +819,15 @@ bibtexin_cleanf( bibl *bin, param *p )
 static int
 bibtexin_typef( fields *bibin, char *filename, int nrefs, param *p )
 {
-	char *refnum = "";
-	int reftype, n, nrefnum;
-	n = fields_find( bibin, "INTERNAL_TYPE", 0 );
-	nrefnum = fields_find( bibin, "REFNUM", 0 );
-	if ( nrefnum!=-1 ) refnum = (bibin->data[nrefnum]).data;
-	if ( n!=-1 )
-		/* figure out type */
-		reftype = get_reftype( (bibin->data[n]).data, nrefs,
-			p->progname, p->all, p->nall, refnum );
-	else
-		/* no type info, go for default */
-		reftype = get_reftype( "", nrefs, p->progname, p->all, p->nall, refnum );
-	return reftype;
+	int ntypename, nrefname, is_default;
+	char *refname = "", *typename = "";
+
+	ntypename = fields_find( bibin, "INTERNAL_TYPE", LEVEL_MAIN );
+	nrefname  = fields_find( bibin, "REFNUM",        LEVEL_MAIN );
+	if ( nrefname!=-1 )  refname  = fields_value( bibin, nrefname,  FIELDS_CHRP_NOUSE );
+	if ( ntypename!=-1 ) typename = fields_value( bibin, ntypename, FIELDS_CHRP_NOUSE );
+
+	return get_reftype( typename, nrefs, p->progname, p->all, p->nall, refname, &is_default, REFTYPE_CHATTY );
 }
 
 /*****************************************************
@@ -868,57 +864,6 @@ out:
 	return status;
 }
 
-/**** bibtexin_bturl() ****/
-
-typedef struct url_t {
-	char *prefix;
-	char *tag;
-	int offset;
-} url_t;
-
-static int
-process_url( fields *bibout, newstr *value, int level )
-{
-	/* don't need to specify URL's like http:, ftp:, etc. here */
-	url_t prefixes[] = {
-		{ "\\urllink",                           "URL",       8 },
-		{ "\\url",                               "URL",       4 },
-		{ "arXiv:",                              "ARXIV",     6 },
-		{ "http://arxiv.org/abs/",               "ARXIV",    21 },
-		{ "jstor:",                              "JSTOR",     6 },
-		{ "http://www.jstor.org/stable/",        "JSTOR",    28 },
-		{ "medline:",                            "MEDLINE",   8 },
-		{ "pubmed:",                             "PMID",      7 },
-		{ "http://www.ncbi.nlm.nih.gov/pubmed/", "PMID",     35 },
-		{ "isi:",                                "ISIREFNUM", 4 },
-	};
-	int nprefixes = sizeof( prefixes ) / sizeof( prefixes[0] );
-
-	char *p = value->data;
-	char *tag = "URL";
-	int fstatus;
-	int i;
-
-	for ( i=0; i<nprefixes; ++i ) {
-		if ( !strncasecmp( p, prefixes[i].prefix, prefixes[i].offset ) ) {
-			tag = prefixes[i].tag;
-			p   = p + prefixes[i].offset;
-			break;
-		}
-	}
-
-	fstatus = fields_add( bibout, tag, p, level );
-
-	if ( fstatus==FIELDS_OK ) return BIBL_OK;
-	else return BIBL_ERR_MEMERR;
-}
-
-static int
-bibtexin_bturl( fields *bibin, newstr *intag, newstr *invalue, int level, param *pm, char *outtag, fields *bibout )
-{
-	return process_url( bibout, invalue, level );
-}
-
 /**** bibtexin_btorg ****/
 
 /*
@@ -933,7 +878,7 @@ bibtexin_bturl( fields *bibin, newstr *intag, newstr *invalue, int level, param 
  */
 
 static int
-bibtexin_btorg( fields *bibin, newstr *intag, newstr *invalue, int level, param *pm, char *outtag, fields *bibout )
+bibtexin_btorg( fields *bibin, int m, newstr *intag, newstr *invalue, int level, param *pm, char *outtag, fields *bibout )
 {
 	int n, fstatus;
 	n = fields_find( bibin, "publisher", LEVEL_ANY );
@@ -954,7 +899,7 @@ bibtexin_btorg( fields *bibin, newstr *intag, newstr *invalue, int level, param 
  */
 
 static int
-bibtexin_btsente( fields *bibin, newstr *intag, newstr *invalue, int level, param *pm, char *outtag, fields *bibout )
+bibtexin_btsente( fields *bibin, int n, newstr *intag, newstr *invalue, int level, param *pm, char *outtag, fields *bibout )
 {
 	int fstatus, status = BIBL_OK;
 	newstr link;
@@ -1006,7 +951,7 @@ last_colon( char *p )
  * file={Description:/full/path/to/file.pdf:PDF}
  */
 static int
-bibtexin_linkedfile( fields *bibin, newstr *intag, newstr *invalue, int level, param *pm, char *outtag, fields *bibout )
+bibtexin_linkedfile( fields *bibin, int m, newstr *intag, newstr *invalue, int level, param *pm, char *outtag, fields *bibout )
 {
 	int fstatus, status = BIBL_OK;
 	char *p = invalue->data;
@@ -1060,7 +1005,7 @@ out:
  */
 
 static int
-bibtexin_howpublished( fields *bibin, newstr *intag, newstr *invalue, int level, param *pm, char *outtag, fields *bibout )
+bibtexin_howpublished( fields *bibin, int n, newstr *intag, newstr *invalue, int level, param *pm, char *outtag, fields *bibout )
 {
 	int fstatus, status = BIBL_OK;
 	if ( !strncasecmp( invalue->data, "Diplom", 6 ) ) {
@@ -1070,7 +1015,7 @@ bibtexin_howpublished( fields *bibin, newstr *intag, newstr *invalue, int level,
 		fstatus = fields_replace_or_add( bibout, "GENRE", "Habilitation thesis", level );
 		if ( fstatus!=FIELDS_OK ) status = BIBL_ERR_MEMERR;
 	} else if ( is_embedded_link( invalue->data ) ) {
-		status = process_url( bibout, invalue, level );
+		status =  urls_split_and_add( invalue->data, bibout, level );
 	} else {
 		fstatus = fields_add( bibout, "PUBLISHER", invalue->data, level );
 		if ( fstatus!=FIELDS_OK ) status = BIBL_ERR_MEMERR;
@@ -1145,7 +1090,7 @@ process_eprint_without_prefix( fields *bibout, newstr *value, int level )
 }
 
 static int
-bibtexin_eprint( fields *bibin, newstr *intag, newstr *invalue, int level, param *pm, char *outtag, fields *bibout )
+bibtexin_eprint( fields *bibin, int m, newstr *intag, newstr *invalue, int level, param *pm, char *outtag, fields *bibout )
 {
 	char *prefix;
 	int n;
@@ -1172,7 +1117,7 @@ bibtexin_eprint( fields *bibin, newstr *intag, newstr *invalue, int level, param
  */
 
 static int
-bibtexin_keyword( fields *bibin, newstr *intag, newstr *invalue, int level, param *pm, char *outtag, fields *bibout )
+bibtexin_keyword( fields *bibin, int m, newstr *intag, newstr *invalue, int level, param *pm, char *outtag, fields *bibout )
 {
 	int fstatus, status = BIBL_OK;
 	newstr keyword;
@@ -1211,7 +1156,7 @@ out:
  */
 
 static int
-bibtexin_person( fields *bibin, newstr *intag, newstr *invalue, int level, param *pm, char *outtag, fields *bibout )
+bibtexin_person( fields *bibin, int m, newstr *intag, newstr *invalue, int level, param *pm, char *outtag, fields *bibout )
 {
 	int begin, end, ok, n, etal, i, status, match;
 	list tokens;
@@ -1313,7 +1258,7 @@ bibtexin_titleinbook_isbooktitle( fields *bibin, char *intag )
 }
 
 static int
-bibtexin_title( fields *bibin, newstr *intag, newstr *invalue, int level, param *pm, char *outtag, fields *bibout )
+bibtexin_title( fields *bibin, int n, newstr *intag, newstr *invalue, int level, param *pm, char *outtag, fields *bibout )
 {
 	int ok;
 
@@ -1335,7 +1280,7 @@ bibtexin_notag( param *p, char *tag )
 static int
 bibtexin_convertf( fields *bibin, fields *bibout, int reftype, param *p )
 {
-	static int (*convertfns[NUM_REFTYPES])(fields *, newstr *, newstr *, int, param *, char *, fields *) = {
+	static int (*convertfns[NUM_REFTYPES])(fields *, int, newstr *, newstr *, int, param *, char *, fields *) = {
 		[ 0 ... NUM_REFTYPES-1 ] = generic_null,
 		[ SIMPLE       ] = generic_simple,
 		[ TITLE        ] = bibtexin_title,
@@ -1348,7 +1293,7 @@ bibtexin_convertf( fields *bibin, fields *bibout, int reftype, param *p )
 		[ NOTES        ] = generic_notes,
 		[ BT_SENTE     ] = bibtexin_btsente,
 		[ BT_ORG       ] = bibtexin_btorg,
-		[ BT_URL       ] = bibtexin_bturl
+		[ URL          ] = generic_url
 	};
 
 	int process, level, i, nfields, status = BIBL_OK;
@@ -1370,7 +1315,7 @@ bibtexin_convertf( fields *bibin, fields *bibout, int reftype, param *p )
 			continue;
 		}
 
-		status = convertfns[ process ] ( bibin, intag, invalue, level, p, outtag, bibout );
+		status = convertfns[ process ] ( bibin, i, intag, invalue, level, p, outtag, bibout );
 		if ( status!=BIBL_OK ) return status;
 	}
 

@@ -13,16 +13,27 @@
 #include "reftypes.h"
 
 int
-get_reftype( char *p, long refnum, char *progname, variants *all, int nall, char *tag )
+get_reftype( char *p, long refnum, char *progname, variants *all, int nall, char *tag, int *is_default, int chattiness )
 {
 	int i;
+
 	p = skip_ws( p );
-	for ( i=0; i<nall; ++i )
+
+	*is_default = 0;
+
+	for ( i=0; i<nall; ++i ) {
 		if ( !strncasecmp( all[i].type, p, strlen(all[i].type) ) ) 
 			return i;
-	if ( progname ) fprintf( stderr, "%s: ", progname );
-	fprintf( stderr, "Did not recognize type '%s' of refnum %ld (%s).\n"
-		"\tDefaulting to article.\n", p, refnum, tag );
+	}
+
+	*is_default = 1;
+
+	if ( chattiness==REFTYPE_CHATTY ) {
+		if ( progname ) fprintf( stderr, "%s: ", progname );
+		fprintf( stderr, "Did not recognize type '%s' of refnum %ld (%s).\n"
+			"\tDefaulting to %s.\n", p, refnum, tag, all[0].type );
+	}
+
 	return 0;
 }
 

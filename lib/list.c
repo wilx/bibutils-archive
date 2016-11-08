@@ -1,7 +1,7 @@
 /*
  * list.c
  *
- * version: 2014-11-15
+ * version: 2016-11-03
  *
  * Copyright (c) Chris Putnam 2004-2016
  *
@@ -19,6 +19,59 @@ list_init( list *a  )
 	a->max = 0;
 	a->n = 0;
 	a->sorted = 1;
+}
+
+int
+list_init_values( list *a, ... )
+{
+	int status = LIST_OK;
+	va_list ap;
+	newstr *s, *t;
+
+	list_init( a );
+
+	va_start( ap, a );
+	do {
+		s = va_arg( ap, newstr * );
+		if ( s ) {
+			t = list_add( a, s );
+			if ( !t ) {
+				status = LIST_ERR;
+				goto out;
+			}
+		}
+	} while ( s );
+out:
+	va_end( ap );
+
+	return status;
+}
+
+int
+list_init_valuesc( list *a, ... )
+{
+	int status = LIST_OK;
+	va_list ap;
+	newstr *t;
+	char *s;
+
+	list_init( a );
+
+	va_start( ap, a );
+	do {
+		s = va_arg( ap, char * );
+		if ( s ) {
+			t = list_addc( a, s );
+			if ( !t ) {
+				status = LIST_ERR;
+				goto out;
+			}
+		}
+	} while ( s );
+out:
+	va_end( ap );
+
+	return status;
 }
 
 void

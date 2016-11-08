@@ -195,12 +195,12 @@ copacin_processf( fields *copacin, char *p, char *filename, long nref, param *pm
  * editors seem to be stuck in as authors with the tag "[Editor]" in it
  */
 static int
-copacin_person( fields *bibin, newstr *intag, newstr *invalue, int level, param *pm, char *outtag, fields *bibout )
+copacin_person( fields *bibin, int n, newstr *intag, newstr *invalue, int level, param *pm, char *outtag, fields *bibout )
 {
 	char *usetag = outtag, editor[]="EDITOR";
+	int comma = 0, i, ok;
 	newstr usename, *s;
 	list tokens;
-	int comma = 0, i, ok;
 
 	if ( list_find( &(pm->asis), invalue->data ) !=-1  ||
 	     list_find( &(pm->corps), invalue->data ) !=-1 ) {
@@ -257,7 +257,7 @@ copacin_report_notag( param *p, char *tag )
 static int
 copacin_convertf( fields *bibin, fields *bibout, int reftype, param *p )
 {
-	static int (*convertfns[NUM_REFTYPES])(fields *, newstr *, newstr *, int, param *, char *, fields *) = {
+	static int (*convertfns[NUM_REFTYPES])(fields *, int, newstr *, newstr *, int, param *, char *, fields *) = {
 		[ 0 ... NUM_REFTYPES-1 ] = generic_null,
 		[ SIMPLE       ] = generic_simple,
 		[ TITLE        ] = generic_title,
@@ -282,7 +282,7 @@ copacin_convertf( fields *bibin, fields *bibout, int reftype, param *p )
 
 		invalue = fields_value( bibin, i, FIELDS_STRP );
 
-		status = convertfns[ process ] ( bibin, intag, invalue, level, p, outtag, bibout );
+		status = convertfns[ process ] ( bibin, i, intag, invalue, level, p, outtag, bibout );
 		if ( status!=BIBL_OK ) return status;
 
 	}

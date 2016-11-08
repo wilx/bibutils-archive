@@ -21,7 +21,6 @@ CONTAIN_OBJS  = fields.o \
                 xml_encoding.o
 
 BIBL_OBJS     = bibl.o \
-                doi.o \
                 iso639_1.o \
                 iso639_2.o \
                 iso639_3.o \
@@ -31,7 +30,8 @@ BIBL_OBJS     = bibl.o \
                 pages.o \
                 reftypes.o \
                 serialno.o \
-                title.o
+                title.o \
+                url.o
 
 INPUT_OBJS    = bibtexin.o bibtextypes.o \
 		biblatexin.o bltypes.o \

@@ -9,9 +9,13 @@
 #ifndef REFTYPES_H
 #define REFTYPES_H
 
+#define REFTYPE_CHATTY  (0)
+#define REFTYPE_SILENT  (1)
+
 /* Reftypes handled by core code */
 #define ALWAYS          (0)
 #define DEFAULT         (1)
+#define SKIP            (2)
 
 /* Reftypes to be handled by converters */
 #define SIMPLE          (2)
@@ -26,7 +30,7 @@
 #define HOWPUBLISHED    (11)
 #define LINKEDFILE      (12)
 #define KEYWORD         (13)
-#define BT_URL          (14) /* Bibtex URL */
+#define URL             (14)
 #define BT_SENTE        (15) /* Bibtex 'Sente' */
 #define BT_GENRE        (16) /* Bibtex Genre */
 #define BT_EPRINT       (17) /* Bibtex 'Eprint' */
@@ -52,10 +56,8 @@ typedef struct {
 	int     ntags;
 } variants;
 
-extern int get_reftype( char *q, long refnum, char *progname, variants *all, int nall, char *tag );
-extern int process_findoldtag( char *oldtag, int reftype, variants all[], int nall );
-extern int translate_oldtag( char *oldtag, int reftype, variants all[], int nall, int *processingtype, int *level, char **newtag );
-
-
+int get_reftype( char *q, long refnum, char *progname, variants *all, int nall, char *tag, int *is_default, int chattiness );
+int process_findoldtag( char *oldtag, int reftype, variants all[], int nall );
+int translate_oldtag( char *oldtag, int reftype, variants all[], int nall, int *processingtype, int *level, char **newtag );
 
 #endif

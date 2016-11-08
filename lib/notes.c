@@ -2,7 +2,7 @@
  * notes.c
  */
 #include <string.h>
-#include "doi.h"
+#include "url.h"
 #include "notes.h"
 
 /*

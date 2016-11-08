@@ -11,10 +11,10 @@
 #include <string.h>
 #include <ctype.h>
 #include "is_ws.h"
-#include "doi.h"
 #include "newstr.h"
 #include "newstr_conv.h"
 #include "fields.h"
+#include "url.h"
 #include "reftypes.h"
 #include "bibformats.h"
 #include "generic.h"
@@ -200,7 +200,7 @@ endin_processf( fields *endin, char *p, char *filename, long nref, param *pm )
  PUBLIC: int endin_typef()
 *****************************************************/
 
-/* Endnote defaults if no %0
+/* Endnote defaults if no %0 tag
  *
  * if %J & %V - journal article
  * if %B - book section
@@ -211,15 +211,14 @@ endin_processf( fields *endin, char *p, char *filename, long nref, param *pm )
 int
 endin_typef( fields *endin, char *filename, int nrefs, param *p )
 {
-	char *refnum = "";
-	int n, reftype, nrefnum, nj, nv, nb, nr, nt, ni;
-	n = fields_find( endin, "%0", 0 );
-	nrefnum = fields_find( endin, "%F", 0 );
-	if ( nrefnum!=-1 ) refnum = endin->data[nrefnum].data;
-	if ( n!=-1 ) {
-		reftype = get_reftype( endin->data[n].data, nrefs, 
-			p->progname, p->all, p->nall, refnum );
-	} else {
+	int ntypename, nrefname, is_default, nj, nv, nb, nr, nt, ni;
+	char *refname = "", *typename="";
+
+	ntypename = fields_find( endin, "%0", LEVEL_MAIN );
+	nrefname  = fields_find( endin, "%F", LEVEL_MAIN );
+	if ( nrefname!=-1  ) refname  = fields_value( endin, nrefname,  FIELDS_CHRP_NOUSE );
+	if ( ntypename!=-1 ) typename = fields_value( endin, ntypename, FIELDS_CHRP_NOUSE );
+	else {
 		nj = fields_find( endin, "%J", 0 );
 		nv = fields_find( endin, "%V", 0 );
 		nb = fields_find( endin, "%B", 0 );
@@ -227,26 +226,19 @@ endin_typef( fields *endin, char *filename, int nrefs, param *p )
 		nt = fields_find( endin, "%T", 0 );
 		ni = fields_find( endin, "%I", 0 );
 		if ( nj!=-1 && nv!=-1 ) {
-			reftype = get_reftype( "Journal Article", nrefs,
-					p->progname, p->all, p->nall, refnum );
+			typename = "Journal Article";
 		} else if ( nb!=-1 ) {
-			reftype = get_reftype( "Book Section", nrefs,
-					p->progname, p->all, p->nall, refnum );
+			typename = "Book Section";
 		} else if ( nr!=-1 && nt==-1 ) {
-			reftype = get_reftype( "Report", nrefs,
-					p->progname, p->all, p->nall, refnum );
+			typename = "Report";
 		} else if ( ni!=-1 && nb==-1 && nj==-1 && nr==-1 ) {
-			reftype = get_reftype( "Book", nrefs,
-					p->progname, p->all, p->nall, refnum );
+			typename = "Book";
 		} else if ( nb==-1 && nj==-1 && nr==-1 && ni==-1 ) {
-			reftype = get_reftype( "Journal Article", nrefs,
-					p->progname, p->all, p->nall, refnum );
-		} else {
-			reftype = get_reftype( "", nrefs, p->progname, 
-					p->all, p->nall, refnum ); /* default */
+			typename = "Journal Article";
 		}
 	}
-	return reftype;
+
+	return get_reftype( typename, nrefs, p->progname, p->all, p->nall, refname, &is_default, REFTYPE_CHATTY );
 }
 
 /*****************************************************
@@ -381,7 +373,7 @@ month_convert( char *in, char *out )
 }
 
 static int
-endin_date( fields *bibin, newstr *intag, newstr *invalue, int level, param *pm, char *outtag, fields *bibout )
+endin_date( fields *bibin, int n, newstr *intag, newstr *invalue, int level, param *pm, char *outtag, fields *bibout )
 {
 	char *tags[3][2] = {
 		{ "DATE:YEAR",  "PARTDATE:YEAR" },
@@ -453,7 +445,7 @@ endin_date( fields *bibin, newstr *intag, newstr *invalue, int level, param *pm,
 }
 
 static int
-endin_type( fields *bibin, newstr *intag, newstr *invalue, int level, param *pm, char *outtag, fields *bibout )
+endin_type( fields *bibin, int n, newstr *intag, newstr *invalue, int level, param *pm, char *outtag, fields *bibout )
 {
 	lookups types[] = {
 		{ "GENERIC",                "ARTICLE" },
@@ -512,7 +504,7 @@ endin_notag( param *p, char *tag, char *data )
 int
 endin_convertf( fields *bibin, fields *bibout, int reftype, param *p )
 {
-	static int (*convertfns[NUM_REFTYPES])(fields *, newstr *, newstr *, int, param *, char *, fields *) = {
+	static int (*convertfns[NUM_REFTYPES])(fields *, int, newstr *, newstr *, int, param *, char *, fields *) = {
 		[ 0 ... NUM_REFTYPES-1 ] = generic_null,
 		[ SIMPLE       ] = generic_simple,
 		[ TITLE        ] = generic_title,
@@ -520,6 +512,7 @@ endin_convertf( fields *bibin, fields *bibout, int reftype, param *p )
 		[ SERIALNO     ] = generic_serialno,
 		[ PAGES        ] = generic_pages,
 		[ NOTES        ] = generic_notes,
+		[ URL          ] = generic_url,
 		[ TYPE         ] = endin_type,
 		[ DATE         ] = endin_date,
         };
@@ -558,7 +551,7 @@ endin_convertf( fields *bibin, fields *bibout, int reftype, param *p )
 
 		fields_setused( bibin, i );
 
-		status = convertfns[ process ]( bibin, intag, invalue, level, p, outtag, bibout );
+		status = convertfns[ process ]( bibin, i, intag, invalue, level, p, outtag, bibout );
 		if ( status!=BIBL_OK ) return status;
 
 	}

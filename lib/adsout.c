@@ -17,6 +17,8 @@
 #include "strsearch.h"
 #include "fields.h"
 #include "name.h"
+#include "title.h"
+#include "url.h"
 #include "bibformats.h"
 
 static int  adsout_write( fields *in, FILE *fp, param *p, unsigned long refnum );
@@ -166,17 +168,7 @@ append_title( fields *in, char *ttl, char *sub, char *adstag, int level, fields 
 
 		output = 1;
 
-		newstr_newstrcpy( &fulltitle, title );
-
-		if ( subtitle && subtitle->len ) {
-			if ( title->data[ title->len - 1 ] != '?' ) {
-				newstr_strcat( &fulltitle, ": " );
-			}
-			else {
-				newstr_strcat( &fulltitle, " " );
-			}
-			newstr_newstrcat( &fulltitle, subtitle );
-		}
+		title_combine( &fulltitle, title, subtitle );
 
 		vol = fields_findv( in, LEVEL_ANY, FIELDS_STRP, "VOLUME" );
 		if ( vol && vol->len ) {
@@ -433,28 +425,23 @@ append_Rtag( fields *in, char *adstag, int type, fields *out, int *status )
 }
 
 static void
-append_easyall( fields *in, char *tag, char *adstag, char *prefix, int level, fields *out, int *status )
+append_easyall( fields *in, char *tag, char *adstag, int level, fields *out, int *status )
 {
 	int i, fstatus;
-	newstr value;
 	vplist a;
 
-	newstr_init( &value );
 	vplist_init( &a );
 
 	fields_findv_each( in, level, FIELDS_CHRP, &a, tag );
 
 	for ( i=0; i<a.n; ++i ) {
-		newstr_strcpy( &value, prefix );
-		newstr_strcat( &value, (char*) vplist_get( &a, i ) );
-		fstatus = fields_add( out, adstag, newstr_cstr( &value  ), LEVEL_MAIN );
+		fstatus = fields_add( out, adstag, (char*) vplist_get( &a, i ), LEVEL_MAIN );
 		if ( fstatus!=FIELDS_OK ) {
 			*status = BIBL_ERR_MEMERR;
 			goto out;
 		}
 	}
 out:
-	newstr_free( &value );
 	vplist_free( &a );
 }
 
@@ -495,6 +482,23 @@ append_keys( fields *in, char *tag, char *adstag, int level, fields *out, int *s
 
 	newstr_free( &allkeys );
 	vplist_free( &a );
+}
+
+static void
+append_urls( fields *in, fields *out, int *status )
+{
+	int lstatus;
+	list types;
+
+	lstatus = list_init_valuesc( &types, "URL", "PMID", "PMC", "ARXIV", "JSTOR", "MRNUMBER", "FILEATTACH", "FIGATTACH", NULL );
+	if ( lstatus!=LIST_OK ) {
+		*status = BIBL_ERR_MEMERR;
+		return;
+	}
+
+	*status = urls_merge_and_add( in, LEVEL_ANY, out, "%U", LEVEL_MAIN, &types );
+
+	list_free( &types );
 }
 
 static void
@@ -548,19 +552,12 @@ append_data( fields *in, fields *out )
 	append_easy   ( in, "ISSUE",      "%N", LEVEL_ANY, out, &status );
 	append_easy   ( in, "NUMBER",     "%N", LEVEL_ANY, out, &status );
 	append_easy   ( in, "LANGUAGE",   "%M", LEVEL_ANY, out, &status );
-	append_easyall( in, "NOTES",      "%X", "", LEVEL_ANY, out, &status );
+	append_easyall( in, "NOTES",      "%X", LEVEL_ANY, out, &status );
 	append_easy   ( in, "ABSTRACT",   "%B", LEVEL_ANY, out, &status );
 	append_keys   ( in, "KEYWORD",    "%K", LEVEL_ANY, out, &status );
-	append_easyall( in, "URL",        "%U", "", LEVEL_ANY, out, &status );
-	append_easyall( in, "ARXIV",      "%U", "http://arxiv.org/abs/", LEVEL_ANY, out, &status );
-	append_easyall( in, "JSTOR",      "%U", "http://www.jstor.org/stable/", LEVEL_ANY, out, &status );
-	append_easyall( in, "PMID",       "%U", "http://www.ncbi.nlm.nih.gov/pubmed/", LEVEL_ANY, out, &status );
-	append_easyall( in, "PMC",        "%U", "http://www.ncbi.nlm.nih.gov/pmc/articles/", LEVEL_ANY, out, &status );
-	append_easyall( in, "MRNUMBER",   "%U", "http://www.ams.org/mathscinet-getitem?mr=", LEVEL_ANY, out, &status );
-	append_easyall( in, "FILEATTACH", "%U", "", LEVEL_ANY, out, &status );
-	append_easyall( in, "FIGATTACH",  "%U", "", LEVEL_ANY, out, &status );
+	append_urls   ( in, out, &status );
 	append_pages  ( in, out, &status );
-	append_easyall( in, "DOI",        "%Y", "", LEVEL_ANY, out, &status );
+	append_easyall( in, "DOI",        "%Y", LEVEL_ANY, out, &status );
 	append_trailer( out, &status );
 	append_Rtag   ( in, "%R", type, out, &status );
 

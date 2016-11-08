@@ -80,7 +80,7 @@ static lookups generic[] = {
 	{ "U3", "NOTES",        NOTES,   LEVEL_MAIN },   /* 'User' - Deprecated? */
 	{ "U4", "NOTES",        NOTES,   LEVEL_MAIN },   /* 'User' - Deprecated? */
 	{ "U5", "NOTES",        NOTES,   LEVEL_MAIN },   /* 'User' - Deprecated? */
-	{ "UR", "URL",          SIMPLE,  LEVEL_MAIN },   /* URL */
+	{ "UR", "URL",          URL,     LEVEL_MAIN },   /* URL */
 	{ "VL", "VOLUME",       SIMPLE,  LEVEL_MAIN },   /* Volume */
 	{ "VO", "VOLUME",       SIMPLE,  LEVEL_MAIN },   /* Deprecated? */
 	{ "Y1", "DATE:YEAR",    DATE,    LEVEL_MAIN },   /* Deprecated? */
@@ -154,7 +154,7 @@ static lookups article[] = {
 	{ "U3", "NOTES",        NOTES,   LEVEL_MAIN },   /* 'User' - Deprecated? */
 	{ "U4", "NOTES",        NOTES,   LEVEL_MAIN },   /* 'User' - Deprecated? */
 	{ "U5", "NOTES",        NOTES,   LEVEL_MAIN },   /* 'User' - Deprecated? */
-	{ "UR", "URL",          SIMPLE,  LEVEL_MAIN },   /* URL */
+	{ "UR", "URL",          URL,     LEVEL_MAIN },   /* URL */
 	{ "VL", "VOLUME",       SIMPLE,  LEVEL_MAIN },   /* Volume */
 	{ "VO", "VOLUME",       SIMPLE,  LEVEL_MAIN },   /* Deprecated? */
 	{ "Y1", "PARTDATE:YEAR",DATE,    LEVEL_MAIN },   /* Deprecated */
@@ -235,7 +235,7 @@ static lookups magarticle[] = {
 	{ "U3", "NOTES",        NOTES,   LEVEL_MAIN },   /* 'User' - Deprecated? */
 	{ "U4", "NOTES",        NOTES,   LEVEL_MAIN },   /* 'User' - Deprecated? */
 	{ "U5", "NOTES",        NOTES,   LEVEL_MAIN },   /* 'User' - Deprecated? */
-	{ "UR", "URL",          SIMPLE,  LEVEL_MAIN },   /* URL */
+	{ "UR", "URL",          URL,     LEVEL_MAIN },   /* URL */
 	{ "VL", "VOLUME",       SIMPLE,  LEVEL_MAIN },   /* Volume */
 	{ "VO", "VOLUME",       SIMPLE,  LEVEL_MAIN },   /* Deprecated? */
 	{ "Y1", "PARTDATE:YEAR",DATE,    LEVEL_MAIN },   /* Deprecated */
@@ -313,7 +313,7 @@ static lookups newsarticle[] = {
 	{ "U3", "NOTES",        NOTES,   LEVEL_MAIN },   /* 'User' - Deprecated? */
 	{ "U4", "NOTES",        NOTES,   LEVEL_MAIN },   /* 'User' - Deprecated? */
 	{ "U5", "NOTES",        NOTES,   LEVEL_MAIN },   /* 'User' - Deprecated? */
-	{ "UR", "URL",          SIMPLE,  LEVEL_MAIN },   /* URL */
+	{ "UR", "URL",          URL,     LEVEL_MAIN },   /* URL */
 	{ "VL", "VOLUME",       SIMPLE,  LEVEL_MAIN },   /* Volume */
 	{ "VO", "VOLUME",       SIMPLE,  LEVEL_MAIN },   /* Deprecated? */
 	{ "Y1", "PARTDATE:YEAR",DATE,    LEVEL_MAIN },   /* Deprecated */
@@ -392,7 +392,7 @@ static lookups book[] = {
 	{ "U3", "NOTES",        NOTES,   LEVEL_MAIN },   /* 'User' - Deprecated? */
 	{ "U4", "NOTES",        NOTES,   LEVEL_MAIN },   /* 'User' - Deprecated? */
 	{ "U5", "NOTES",        NOTES,   LEVEL_MAIN },   /* 'User' - Deprecated? */
-	{ "UR", "URL",          SIMPLE,  LEVEL_MAIN },   /* URL */
+	{ "UR", "URL",          URL,     LEVEL_MAIN },   /* URL */
 	{ "VL", "VOLUME",       SIMPLE,  LEVEL_MAIN },   /* Volume */
 	{ "VO", "VOLUME",       SIMPLE,  LEVEL_MAIN },   /* Deprecated? */
 	{ "Y1", "DATE:YEAR",    DATE,    LEVEL_MAIN },   /* Deprecated */
@@ -470,7 +470,7 @@ static lookups inbook[] = {
 	{ "U3", "NOTES",        NOTES,   LEVEL_MAIN },   /* 'User' - Deprecated? */
 	{ "U4", "NOTES",        NOTES,   LEVEL_MAIN },   /* 'User' - Deprecated? */
 	{ "U5", "NOTES",        NOTES,   LEVEL_MAIN },   /* 'User' - Deprecated? */
-	{ "UR", "URL",          SIMPLE,  LEVEL_MAIN },   /* URL */
+	{ "UR", "URL",          URL,     LEVEL_MAIN },   /* URL */
 	{ "VL", "VOLUME",       SIMPLE,  LEVEL_HOST },   /* Volume */
 	{ "VO", "VOLUME",       SIMPLE,  LEVEL_HOST },   /* Deprecated? */
 	{ "Y1", "DATE:YEAR",    DATE,    LEVEL_HOST },   /* Deprecated */
@@ -549,7 +549,7 @@ static lookups conference[] = {
 	{ "U3", "NOTES",        NOTES,   LEVEL_MAIN },   /* 'User' - Deprecated? */
 	{ "U4", "NOTES",        NOTES,   LEVEL_MAIN },   /* 'User' - Deprecated? */
 	{ "U5", "NOTES",        NOTES,   LEVEL_MAIN },   /* 'User' - Deprecated? */
-	{ "UR", "URL",          SIMPLE,  LEVEL_MAIN },   /* URL */
+	{ "UR", "URL",          URL,     LEVEL_MAIN },   /* URL */
 	{ "VL", "VOLUME",       SIMPLE,  LEVEL_MAIN },   /* Volume */
 	{ "VO", "VOLUME",       SIMPLE,  LEVEL_MAIN },   /* Deprecated? */
 	{ "Y1", "DATE:YEAR",    DATE,    LEVEL_HOST },   /* Deprecated */
@@ -627,7 +627,7 @@ static lookups statute[] = {
 	{ "U3", "NOTES",        NOTES,   LEVEL_MAIN },   /* 'User' - Deprecated? */
 	{ "U4", "NOTES",        NOTES,   LEVEL_MAIN },   /* 'User' - Deprecated? */
 	{ "U5", "NOTES",        NOTES,   LEVEL_MAIN },   /* 'User' - Deprecated? */
-	{ "UR", "URL",          SIMPLE,  LEVEL_MAIN },   /* URL */
+	{ "UR", "URL",          URL,     LEVEL_MAIN },   /* URL */
 	{ "VL", "VOLUME",       SIMPLE,  LEVEL_MAIN },   /* Volume */
 	{ "VO", "VOLUME",       SIMPLE,  LEVEL_MAIN },   /* Deprecated? */
 	{ "Y1", "DATE:YEAR",    DATE,    LEVEL_MAIN },   /* Deprecated */
@@ -705,7 +705,7 @@ static lookups hearing[] = {
 	{ "U3", "NOTES",        NOTES,   LEVEL_MAIN },   /* 'User' - Deprecated? */
 	{ "U4", "NOTES",        NOTES,   LEVEL_MAIN },   /* 'User' - Deprecated? */
 	{ "U5", "NOTES",        NOTES,   LEVEL_MAIN },   /* 'User' - Deprecated? */
-	{ "UR", "URL",          SIMPLE,  LEVEL_MAIN },   /* URL */
+	{ "UR", "URL",          URL,     LEVEL_MAIN },   /* URL */
 	{ "VL", "VOLUME",       SIMPLE,  LEVEL_MAIN },   /* Volume */
 	{ "VO", "VOLUME",       SIMPLE,  LEVEL_MAIN },   /* Deprecated? */
 	{ "Y1", "DATE:YEAR",    DATE,    LEVEL_MAIN },   /* Deprecated */
@@ -782,7 +782,7 @@ static lookups cases[] = {
 	{ "U3", "NOTES",        NOTES,   LEVEL_MAIN },   /* 'User' - Deprecated? */
 	{ "U4", "NOTES",        NOTES,   LEVEL_MAIN },   /* 'User' - Deprecated? */
 	{ "U5", "NOTES",        NOTES,   LEVEL_MAIN },   /* 'User' - Deprecated? */
-	{ "UR", "URL",          SIMPLE,  LEVEL_MAIN },   /* URL */
+	{ "UR", "URL",          URL,     LEVEL_MAIN },   /* URL */
 	{ "VL", "VOLUME",       SIMPLE,  LEVEL_MAIN },   /* Volume */
 	{ "VO", "VOLUME",       SIMPLE,  LEVEL_MAIN },   /* Deprecated? */
 	{ "Y1", "DATE:YEAR",    DATE,    LEVEL_MAIN },   /* Deprecated */
@@ -859,7 +859,7 @@ static lookups communication[] = {
 	{ "U3", "NOTES",        NOTES,   LEVEL_MAIN },   /* 'User' - Deprecated? */
 	{ "U4", "NOTES",        NOTES,   LEVEL_MAIN },   /* 'User' - Deprecated? */
 	{ "U5", "NOTES",        NOTES,   LEVEL_MAIN },   /* 'User' - Deprecated? */
-	{ "UR", "URL",          SIMPLE,  LEVEL_MAIN },   /* URL */
+	{ "UR", "URL",          URL,     LEVEL_MAIN },   /* URL */
 	{ "VL", "VOLUME",       SIMPLE,  LEVEL_MAIN },   /* Volume */
 	{ "VO", "VOLUME",       SIMPLE,  LEVEL_MAIN },   /* Deprecated? */
 	{ "Y1", "DATE:YEAR",    DATE,    LEVEL_MAIN },   /* Deprecated */
@@ -936,7 +936,7 @@ static lookups thesis[] = {
 	{ "U3", "NOTES",        NOTES,   LEVEL_MAIN },   /* 'User' - Deprecated? */
 	{ "U4", "NOTES",        NOTES,   LEVEL_MAIN },   /* 'User' - Deprecated? */
 	{ "U5", "NOTES",        NOTES,   LEVEL_MAIN },   /* 'User' - Deprecated? */
-	{ "UR", "URL",          SIMPLE,  LEVEL_MAIN },   /* URL */
+	{ "UR", "URL",          URL,     LEVEL_MAIN },   /* URL */
 	{ "VL", "VOLUME",       SIMPLE,  LEVEL_MAIN },   /* Volume */
 	{ "VO", "VOLUME",       SIMPLE,  LEVEL_MAIN },   /* Deprecated? */
 	{ "Y1", "DATE:YEAR",    DATE,    LEVEL_MAIN },   /* Deprecated */
@@ -1014,7 +1014,7 @@ static lookups report[] = {
 	{ "U3", "NOTES",        NOTES,   LEVEL_MAIN },   /* 'User' - Deprecated? */
 	{ "U4", "NOTES",        NOTES,   LEVEL_MAIN },   /* 'User' - Deprecated? */
 	{ "U5", "NOTES",        NOTES,   LEVEL_MAIN },   /* 'User' - Deprecated? */
-	{ "UR", "URL",          SIMPLE,  LEVEL_MAIN },   /* URL */
+	{ "UR", "URL",          URL,     LEVEL_MAIN },   /* URL */
 	{ "VL", "VOLUME",       SIMPLE,  LEVEL_MAIN },   /* Volume */
 	{ "VO", "VOLUME",       SIMPLE,  LEVEL_MAIN },   /* Deprecated? */
 	{ "Y1", "DATE:YEAR",    DATE,    LEVEL_MAIN },   /* Deprecated */
@@ -1092,7 +1092,7 @@ static lookups abstract[] = {
 	{ "U3", "NOTES",        NOTES,   LEVEL_MAIN },   /* 'User' - Deprecated? */
 	{ "U4", "NOTES",        NOTES,   LEVEL_MAIN },   /* 'User' - Deprecated? */
 	{ "U5", "NOTES",        NOTES,   LEVEL_MAIN },   /* 'User' - Deprecated? */
-	{ "UR", "URL",          SIMPLE,  LEVEL_MAIN },   /* URL */
+	{ "UR", "URL",          URL,     LEVEL_MAIN },   /* URL */
 	{ "VL", "VOLUME",       SIMPLE,  LEVEL_MAIN },   /* Volume */
 	{ "VO", "VOLUME",       SIMPLE,  LEVEL_MAIN },   /* Deprecated? */
 	{ "Y1", "DATE:YEAR",    DATE,    LEVEL_MAIN },   /* Deprecated */
@@ -1168,7 +1168,7 @@ static lookups program[] = {
 	{ "U3", "NOTES",        NOTES,   LEVEL_MAIN },   /* 'User' - Deprecated? */
 	{ "U4", "NOTES",        NOTES,   LEVEL_MAIN },   /* 'User' - Deprecated? */
 	{ "U5", "NOTES",        NOTES,   LEVEL_MAIN },   /* 'User' - Deprecated? */
-	{ "UR", "URL",          SIMPLE,  LEVEL_MAIN },   /* URL */
+	{ "UR", "URL",          URL,     LEVEL_MAIN },   /* URL */
 	{ "VL", "VOLUME",       SIMPLE,  LEVEL_MAIN },   /* Volume */
 	{ "VO", "VOLUME",       SIMPLE,  LEVEL_MAIN },   /* Deprecated? */
 	{ "Y1", "DATE:YEAR",    DATE,    LEVEL_MAIN },   /* Deprecated */
@@ -1244,7 +1244,7 @@ static lookups patent[] = {
 	{ "U3", "NOTES",        NOTES,   LEVEL_MAIN },   /* 'User' - Deprecated? */
 	{ "U4", "NOTES",        NOTES,   LEVEL_MAIN },   /* 'User' - Deprecated? */
 	{ "U5", "NOTES",        NOTES,   LEVEL_MAIN },   /* 'User' - Deprecated? */
-	{ "UR", "URL",          SIMPLE,  LEVEL_MAIN },   /* URL */
+	{ "UR", "URL",          URL,     LEVEL_MAIN },   /* URL */
 	{ "VL", "VOLUME",       SIMPLE,  LEVEL_MAIN },   /* Volume */
 	{ "VO", "VOLUME",       SIMPLE,  LEVEL_MAIN },   /* Deprecated? */
 	{ "Y1", "DATE:YEAR",    DATE,    LEVEL_MAIN },   /* Deprecated */
@@ -1321,7 +1321,7 @@ static lookups electric[] = {
 	{ "U3", "NOTES",        NOTES,   LEVEL_MAIN },   /* 'User' - Deprecated? */
 	{ "U4", "NOTES",        NOTES,   LEVEL_MAIN },   /* 'User' - Deprecated? */
 	{ "U5", "NOTES",        NOTES,   LEVEL_MAIN },   /* 'User' - Deprecated? */
-	{ "UR", "URL",          SIMPLE,  LEVEL_MAIN },   /* URL */
+	{ "UR", "URL",          URL,     LEVEL_MAIN },   /* URL */
 	{ "VL", "VOLUME",       SIMPLE,  LEVEL_MAIN },   /* Volume */
 	{ "VO", "VOLUME",       SIMPLE,  LEVEL_MAIN },   /* Deprecated? */
 	{ "Y1", "DATE:YEAR",    DATE,    LEVEL_MAIN },   /* Deprecated */
@@ -1398,7 +1398,7 @@ static lookups pamphlet[] = {
 	{ "U3", "NOTES",        NOTES,   LEVEL_MAIN },   /* 'User' - Deprecated? */
 	{ "U4", "NOTES",        NOTES,   LEVEL_MAIN },   /* 'User' - Deprecated? */
 	{ "U5", "NOTES",        NOTES,   LEVEL_MAIN },   /* 'User' - Deprecated? */
-	{ "UR", "URL",          SIMPLE,  LEVEL_MAIN },   /* URL */
+	{ "UR", "URL",          URL,     LEVEL_MAIN },   /* URL */
 	{ "VL", "VOLUME",       SIMPLE,  LEVEL_MAIN },   /* Volume */
 	{ "VO", "VOLUME",       SIMPLE,  LEVEL_MAIN },   /* Deprecated? */
 	{ "Y1", "DATE:YEAR",    DATE,    LEVEL_MAIN },   /* Deprecated */
@@ -1475,7 +1475,7 @@ static lookups map[] = {
 	{ "U3", "NOTES",        NOTES,   LEVEL_MAIN },   /* 'User' - Deprecated? */
 	{ "U4", "NOTES",        NOTES,   LEVEL_MAIN },   /* 'User' - Deprecated? */
 	{ "U5", "NOTES",        NOTES,   LEVEL_MAIN },   /* 'User' - Deprecated? */
-	{ "UR", "URL",          SIMPLE,  LEVEL_MAIN },   /* URL */
+	{ "UR", "URL",          URL,     LEVEL_MAIN },   /* URL */
 	{ "VL", "VOLUME",       SIMPLE,  LEVEL_MAIN },   /* Volume */
 	{ "VO", "VOLUME",       SIMPLE,  LEVEL_MAIN },   /* Deprecated? */
 	{ "Y1", "DATE:YEAR",    DATE,    LEVEL_MAIN },   /* Deprecated? */
@@ -1552,7 +1552,7 @@ static lookups unpublished[] = {
 	{ "U3", "NOTES",        NOTES,   LEVEL_MAIN },   /* 'User' - Deprecated? */
 	{ "U4", "NOTES",        NOTES,   LEVEL_MAIN },   /* 'User' - Deprecated? */
 	{ "U5", "NOTES",        NOTES,   LEVEL_MAIN },   /* 'User' - Deprecated? */
-	{ "UR", "URL",          SIMPLE,  LEVEL_MAIN },   /* URL */
+	{ "UR", "URL",          URL,     LEVEL_MAIN },   /* URL */
 	{ "VL", "VOLUME",       SIMPLE,  LEVEL_MAIN },   /* Volume */
 	{ "VO", "VOLUME",       SIMPLE,  LEVEL_MAIN },   /* Deprecated? */
 	{ "Y1", "DATE:YEAR",    DATE,    LEVEL_MAIN },   /* Deprecated */

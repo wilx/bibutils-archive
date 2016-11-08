@@ -6,7 +6,7 @@
   <!ENTITY dhfirstname "<firstname>David</firstname>">
   <!ENTITY dhsurname   "<surname>Bremner</surname>">
   <!-- Please adjust the date whenever revising the manpage. -->
-  <!ENTITY dhdate      "<date>December 10, 2010</date>">
+  <!ENTITY dhdate      "<date>November 8, 2016</date>">
   <!-- SECTION should be 1-8, maybe w/ subsection other parameters are
        allowed: see man(7), man(1). -->
   <!ENTITY dhsection   "<manvolnum>1</manvolnum>">
@@ -18,14 +18,14 @@
   <!ENTITY debian      "<productname>Debian</productname>">
   <!ENTITY gnu         "<acronym>GNU</acronym>">
   <!ENTITY gpl         "&gnu; <acronym>GPL</acronym>">
-  <!ENTITY version	"5.10">
+  <!ENTITY version	"5.11">
 
   ]>
 <refentry>
   <refentryinfo>
     <address>&dhemail;</address>
     <copyright>
-      <year>2010</year>
+      <year>2016</year>
       <holder>&dhusername; (Manual)</holder>
     </copyright>
     <copyright>
@@ -56,6 +56,7 @@
     <refname>isi2xml</refname>
     <refname>med2xml</refname>
     <refname>modsclean</refname>
+    <refname>nbib2xml</refname>
     <refname>ris2xml</refname>
     <refname>xml2ads</refname>
     <refname>xml2bib</refname>
@@ -148,6 +149,10 @@
       <seglistitem>
         <seg>med2xml</seg>
         <seg>convert Pubmed XML references to MODS</seg>
+      </seglistitem>
+      <seglistitem>
+        <seg>nbib2xml</seg>
+        <seg>convert Pubmed nbib format references to MODS</seg>
       </seglistitem>
       <seglistitem>
         <seg>modsclean</seg><seg>a MODS to MODS converter</seg>

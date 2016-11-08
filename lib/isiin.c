@@ -202,16 +202,16 @@ out:
 static int
 isiin_typef( fields *isiin, char *filename, int nref, param *p )
 {
-	char *refnum = "";
-	int n, reftype, nrefnum;
-	n = fields_find( isiin, "PT", 0 );
-	nrefnum = fields_find ( isiin, "UT", 0 );
-	if ( nrefnum!=-1 ) refnum = isiin->data[nrefnum].data;
-	if ( n!=-1 )
-		reftype = get_reftype( (isiin->data[n]).data, nref, p->progname, p->all, p->nall, refnum );
-	else
-		reftype = get_reftype( "", nref, p->progname, p->all, p->nall, refnum ); /* default */
-	return reftype;
+	int ntypename, nrefname, is_default;
+	char *refname = "", *typename="";
+
+	ntypename = fields_find( isiin, "PT", LEVEL_MAIN );
+	nrefname  = fields_find( isiin, "UT", LEVEL_MAIN );
+
+	if ( nrefname!=-1 )  refname  = fields_value( isiin, nrefname,  FIELDS_CHRP_NOUSE );
+	if ( ntypename!=-1 ) typename = fields_value( isiin, ntypename, FIELDS_CHRP_NOUSE );
+
+	return get_reftype( typename, nref, p->progname, p->all, p->nall, refname, &is_default, REFTYPE_CHATTY );
 }
 
 /*****************************************************
@@ -249,7 +249,7 @@ isiin_addauthors( fields *isiin, fields *info, int reftype, variants *all, int n
 }
 
 static int
-isiin_keyword( fields *bibin, newstr *intag, newstr *invalue, int level, param *pm, char *outtag, fields *bibout )
+isiin_keyword( fields *bibin, int n, newstr *intag, newstr *invalue, int level, param *pm, char *outtag, fields *bibout )
 {
 	int fstatus, status = BIBL_OK;
 	char *p = invalue->data;
@@ -281,7 +281,7 @@ isiin_report_notag( param *p, char *tag )
 static int
 isiin_convertf( fields *bibin, fields *bibout, int reftype, param *p )
 {
-	static int (*convertfns[NUM_REFTYPES])(fields *, newstr *, newstr *, int, param *, char *, fields *) = {
+	static int (*convertfns[NUM_REFTYPES])(fields *, int, newstr *, newstr *, int, param *, char *, fields *) = {
 		[ 0 ... NUM_REFTYPES-1 ] = generic_null,
 		[ SIMPLE       ] = generic_simple,
 		[ TITLE        ] = generic_title,
@@ -313,7 +313,7 @@ isiin_convertf( fields *bibin, fields *bibout, int reftype, param *p )
 
 		invalue = fields_value( bibin, i, FIELDS_STRP );
 
-		status = convertfns[ process ] ( bibin, intag, invalue, level, p, outtag, bibout );
+		status = convertfns[ process ] ( bibin, i, intag, invalue, level, p, outtag, bibout );
 		if ( status!=BIBL_OK ) return status;
 	}
 

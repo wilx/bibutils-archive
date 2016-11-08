@@ -17,8 +17,7 @@
 #include "fields.h"
 #include "name.h"
 #include "title.h"
-#include "bibl.h"
-#include "doi.h"
+#include "url.h"
 #include "bibformats.h"
 
 static int  bibtexout_write( fields *in, FILE *fp, param *p, unsigned long refnum );
@@ -609,57 +608,20 @@ append_arxiv( fields *in, fields *out, int *status )
 }
 
 static void
-append_pmc( fields *in, fields *out, int *status )
+append_urls( fields *in, fields *out, int *status )
 {
-	int n, fstatus;
-	newstr url;
+	int lstatus;
+	list types;
 
-	n = fields_find( in, "PMC", LEVEL_ANY);
-	if ( n==-1 ) return;
-
-	newstr_init( &url );
-	pmc_to_url( in, n, "URL", &url );
-	if ( url.len ) {
-		fstatus = fields_add( out, "url", newstr_cstr( &url ), LEVEL_MAIN );
-		if ( fstatus!=FIELDS_OK ) *status = BIBL_ERR_MEMERR;
+	lstatus = list_init_valuesc( &types, "URL", "PMID", "PMC", "JSTOR", NULL );
+	if ( lstatus!=LIST_OK ) {
+		*status = BIBL_ERR_MEMERR;
+		return;
 	}
-	newstr_free( &url );
-}
 
-static void
-append_pmid( fields *in, fields *out, int *status )
-{
-	int n, fstatus;
-	newstr url;
+	*status = urls_merge_and_add( in, LEVEL_ANY, out, "url", LEVEL_MAIN, &types );
 
-	n = fields_find( in, "PMID", LEVEL_ANY );
-	if ( n==-1 ) return;
-
-	newstr_init( &url );
-	pmid_to_url( in, n, "URL", &url );
-	if ( url.len ) {
-		fstatus = fields_add( out, "url", newstr_cstr( &url ), LEVEL_MAIN );
-		if ( fstatus!=FIELDS_OK ) *status = BIBL_ERR_MEMERR;
-	}
-	newstr_free( &url );
-}
-
-static void
-append_jstor( fields *in, fields *out, int *status )
-{
-	int n, fstatus;
-	newstr url;
-
-	n = fields_find( in, "JSTOR", LEVEL_ANY );
-	if ( n==-1 ) return;
-
-	newstr_init( &url );
-	jstor_to_url( in, n, "URL", &url );
-	if ( url.len ) {
-		fstatus = fields_add( out, "url", newstr_cstr( &url ), LEVEL_MAIN );
-		if ( fstatus!=FIELDS_OK ) *status = BIBL_ERR_MEMERR;
-	}
-	newstr_free( &url );
+	list_free( &types );
 }
 
 static void
@@ -791,14 +753,12 @@ append_data( fields *in, fields *out, param *p, unsigned long refnum )
 	append_simpleall   ( in, "ANNOTE",             "annote",    out, &status );
 	append_simple      ( in, "ISBN",               "isbn",      out, &status );
 	append_simple      ( in, "ISSN",               "issn",      out, &status );
+	append_simple      ( in, "MRNUMBER",           "mrnumber",  out, &status );
 	append_simple      ( in, "CODEN",              "coden",     out, &status );
 	append_simple      ( in, "DOI",                "doi",       out, &status );
-	append_simpleall   ( in, "URL",                "url",       out, &status );
+	append_urls        ( in, out, &status );
 	append_fileattach  ( in, out, &status );
 	append_arxiv       ( in, out, &status );
-	append_pmid        ( in, out, &status );
-	append_pmc         ( in, out, &status );
-	append_jstor       ( in, out, &status );
 	append_isi         ( in, out, &status );
 	append_simple      ( in, "LANGUAGE",           "language",  out, &status );
 

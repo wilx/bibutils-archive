@@ -798,19 +798,15 @@ biblatexin_cleanf( bibl *bin, param *p )
 static int
 biblatexin_typef( fields *bibin, char *filename, int nrefs, param *p )
 {
-        char *refnum = "";
-        int reftype, n, nrefnum;
-        n = fields_find( bibin, "INTERNAL_TYPE", 0 );
-        nrefnum = fields_find( bibin, "REFNUM", 0 );
-        if ( nrefnum!=-1 ) refnum = (bibin->data[nrefnum]).data;
-        if ( n!=-1 )
-                /* figure out type */
-                reftype = get_reftype( (bibin->data[n]).data, nrefs,
-                        p->progname, p->all, p->nall, refnum );
-        else
-                /* no type info, go for default */
-                reftype = get_reftype( "", nrefs, p->progname, p->all, p->nall, refnum );
-        return reftype;
+	int ntypename, nrefname, is_default;
+	char *refname = "", *typename="";
+
+	ntypename = fields_find( bibin, "INTERNAL_TYPE", LEVEL_MAIN );
+	nrefname  = fields_find( bibin, "REFNUM",        LEVEL_MAIN );
+	if ( nrefname!=-1 )  refname  = fields_value( bibin, nrefname,  FIELDS_CHRP_NOUSE );
+        if ( ntypename!=-1 ) typename = fields_value( bibin, ntypename, FIELDS_CHRP_NOUSE );
+
+	return get_reftype( typename, nrefs, p->progname, p->all, p->nall, refname, &is_default, REFTYPE_CHATTY );
 }
 
 /*****************************************************
@@ -1037,7 +1033,7 @@ out:
 }
 
 static int
-biblatexin_bltsubtype( fields *bibin, newstr *intag, newstr *invalue, int level, param *pm, char *outtag, fields *bibout )
+biblatexin_bltsubtype( fields *bibin, int n, newstr *intag, newstr *invalue, int level, param *pm, char *outtag, fields *bibout )
 {
 	int fstatus1, fstatus2;
 
@@ -1058,7 +1054,7 @@ biblatexin_bltsubtype( fields *bibin, newstr *intag, newstr *invalue, int level,
 
 /* biblatex drops school field if institution is present */
 static int
-biblatexin_bltschool( fields *bibin, newstr *intag, newstr *invalue, int level, param *pm, char *outtag, fields *bibout )
+biblatexin_bltschool( fields *bibin, int n, newstr *intag, newstr *invalue, int level, param *pm, char *outtag, fields *bibout )
 {
 	int fstatus;
 	if ( fields_find( bibin, "institution", LEVEL_ANY ) != -1 )
@@ -1071,7 +1067,7 @@ biblatexin_bltschool( fields *bibin, newstr *intag, newstr *invalue, int level, 
 }
 
 static int
-biblatexin_bltthesistype( fields *bibin, newstr *intag, newstr *invalue, int level, param *pm, char *outtag, fields *bibout )
+biblatexin_bltthesistype( fields *bibin, int n, newstr *intag, newstr *invalue, int level, param *pm, char *outtag, fields *bibout )
 {
 	char *p = invalue->data;
 	int fstatus = FIELDS_OK;
@@ -1092,7 +1088,7 @@ biblatexin_bltthesistype( fields *bibin, newstr *intag, newstr *invalue, int lev
 }
 
 static int
-biblatexin_bteprint( fields *bibin, newstr *intag, newstr *invalue, int level, param *pm, char *outtag, fields *bibout )
+biblatexin_bteprint( fields *bibin, int n, newstr *intag, newstr *invalue, int level, param *pm, char *outtag, fields *bibout )
 {
 	int neprint, netype, fstatus;
 	char *eprint = NULL, *etype = NULL;
@@ -1137,36 +1133,9 @@ biblatexin_bteprint( fields *bibin, newstr *intag, newstr *invalue, int level, p
 }
 
 static int
-biblatexin_btgenre( fields *bibin, newstr *intag, newstr *invalue, int level, param *pm, char *outtag, fields *bibout )
+biblatexin_btgenre( fields *bibin, int n, newstr *intag, newstr *invalue, int level, param *pm, char *outtag, fields *bibout )
 {
 	if ( fields_add( bibout, "NGENRE", invalue->data, level ) == FIELDS_OK ) return BIBL_OK;
-	else return BIBL_ERR_MEMERR;
-}
-
-static int
-biblatexin_bturl( fields *bibin, newstr *intag, newstr *invalue, int level, param *pm, char *outtag, fields *bibout )
-{
-	char *p = invalue->data;
-	int fstatus;
-
-	if ( !strncasecmp( p, "\\urllink", 8 ) )
-		fstatus = fields_add( bibout, "URL", p+8, level );
-	else if ( !strncasecmp( p, "\\url", 4 ) )
-		fstatus = fields_add( bibout, "URL", p+4, level );
-	else if ( !strncasecmp( p, "arXiv:", 6 ) )
-		fstatus = fields_add( bibout, "ARXIV", p+6, level );
-	else if ( !strncasecmp( p, "jstor", 5 ) )
-		fstatus = fields_add( bibout, "JSTOR", p+5, level );
-	else if ( !strncasecmp( p, "http://www.jstor.org/stable/", 28 ) )
-		fstatus = fields_add( bibout, "JSTOR", p+28, level );
-	else if ( !strncasecmp( p, "http://arxiv.org/abs/", 21 ) )
-		fstatus = fields_add( bibout, "ARXIV", p+21, level );
-	else if ( !strncasecmp( p, "http:", 5 ) )
-		fstatus = fields_add( bibout, "URL", p, level );
-	else
-		fstatus = fields_add( bibout, "URL", p, level );
-
-	if ( fstatus==FIELDS_OK ) return BIBL_OK;
 	else return BIBL_ERR_MEMERR;
 }
 
@@ -1183,7 +1152,7 @@ biblatexin_bturl( fields *bibin, newstr *intag, newstr *invalue, int level, para
  * into this field, so check for that first.
  */
 static int
-biblatexin_howpublished( fields *bibin, newstr *intag, newstr *invalue, int level, param *pm, char *outtag, fields *bibout )
+biblatexin_howpublished( fields *bibin, int n, newstr *intag, newstr *invalue, int level, param *pm, char *outtag, fields *bibout )
 {
 	int fstatus;
 
@@ -1221,7 +1190,7 @@ biblatexin_howpublished( fields *bibin, newstr *intag, newstr *invalue, int leve
  *     "none" (for performer)
  */
 static int
-biblatexin_blteditor( fields *bibin, newstr *intag, newstr *invalue, int level, param *pm, char *outtag, fields *bibout )
+biblatexin_blteditor( fields *bibin, int m, newstr *intag, newstr *invalue, int level, param *pm, char *outtag, fields *bibout )
 {
 	char *editor_fields[] = { "editor", "editora", "editorb", "editorc" };
 	char *editor_types[]  = { "editortype", "editoratype", "editorbtype", "editorctype" };
@@ -1243,7 +1212,7 @@ biblatexin_blteditor( fields *bibin, newstr *intag, newstr *invalue, int level, 
 }
 
 static int
-biblatexin_person( fields *bibin, newstr *intag, newstr *invalue, int level, param *pm, char *outtag, fields *bibout )
+biblatexin_person( fields *bibin, int n, newstr *intag, newstr *invalue, int level, param *pm, char *outtag, fields *bibout )
 {
 	return biblatex_names( bibout, outtag, invalue, level, &(pm->asis), &(pm->corps) );
 }
@@ -1260,7 +1229,7 @@ biblatexin_notag( param *p, char *tag )
 static int
 biblatexin_convertf( fields *bibin, fields *bibout, int reftype, param *p )
 {
-	static int (*convertfns[NUM_REFTYPES])(fields *, newstr *, newstr *, int, param *, char *, fields *) = {
+	static int (*convertfns[NUM_REFTYPES])(fields *, int, newstr *, newstr *, int, param *, char *, fields *) = {
 		[ 0 ... NUM_REFTYPES-1 ] = generic_null,
 		[ SIMPLE          ] = generic_simple,
 		[ PAGES           ] = generic_pages,
@@ -1268,7 +1237,7 @@ biblatexin_convertf( fields *bibin, fields *bibout, int reftype, param *p )
 		[ PERSON          ] = biblatexin_person,
 		[ BLT_EDITOR      ] = biblatexin_blteditor,
 		[ HOWPUBLISHED    ] = biblatexin_howpublished,
-		[ BT_URL          ] = biblatexin_bturl,
+		[ URL             ] = generic_url,
 		[ BT_GENRE        ] = biblatexin_btgenre,
 		[ BT_EPRINT       ] = biblatexin_bteprint,
 		[ BLT_THESIS_TYPE ] = biblatexin_bltthesistype,
@@ -1298,7 +1267,7 @@ biblatexin_convertf( fields *bibin, fields *bibout, int reftype, param *p )
 			continue;
 		}
 
-		status = convertfns[ process ]( bibin, intag, invalue, level, p, outtag, bibout );
+		status = convertfns[ process ]( bibin, i, intag, invalue, level, p, outtag, bibout );
 		if ( status!=BIBL_OK ) return status;
 
 		if ( convertfns[ process ] != generic_null )

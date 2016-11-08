@@ -25,6 +25,7 @@ void isiout_initparams(     param *p, const char *progname );
 void medin_initparams(      param *p, const char *progname );
 void modsin_initparams(     param *p, const char *progname );
 void modsout_initparams(    param *p, const char *progname );
+void nbibin_initparams(      param *p, const char *progname );
 void risin_initparams(      param *p, const char *progname );
 void risout_initparams(     param *p, const char *progname );
 void wordin_initparams(     param *p, const char *progname );

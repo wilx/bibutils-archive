@@ -15,9 +15,9 @@
 #include "fields.h"
 #include "name.h"
 #include "title.h"
+#include "url.h"
 #include "serialno.h"
 #include "reftypes.h"
-#include "doi.h"
 #include "bibformats.h"
 #include "generic.h"
 
@@ -217,17 +217,15 @@ risin_processf( fields *risin, char *p, char *filename, long nref, param *pm )
 static int
 risin_typef( fields *risin, char *filename, int nref, param *p )
 {
-	char *refnum = "";
-	int n, reftype, nreftype;
-	n = fields_find( risin, "TY", 0 );
-	nreftype = fields_find( risin, "ID", 0 );
-	if ( nreftype!=-1 ) refnum = risin[n].data->data;
-	if ( n!=-1 )
-		reftype = get_reftype( (risin[n].data)->data, nref, p->progname,
-			p->all, p->nall, refnum );
-	else
-		reftype = get_reftype( "", nref, p->progname, p->all, p->nall, refnum ); /*default */
-	return reftype;
+	int ntypename, nrefname, is_default;
+	char *refname = "", *typename = "";
+
+	ntypename = fields_find( risin, "TY", LEVEL_MAIN );
+	nrefname  = fields_find( risin, "ID", LEVEL_MAIN );
+	if ( ntypename!=-1 ) typename = fields_value( risin, ntypename, FIELDS_CHRP_NOUSE );
+	if ( nrefname!=-1 )  refname  = fields_value( risin, nrefname,  FIELDS_CHRP_NOUSE );
+
+	return get_reftype( typename, nref, p->progname, p->all, p->nall, refname, &is_default, REFTYPE_CHATTY );
 }
 
 /*****************************************************
@@ -242,24 +240,24 @@ is_uri_file_scheme( char *p )
 }
 
 static int
-risin_linkedfile( fields *bibin, newstr *intag, newstr *invalue, int level, param *pm, char *outtag, fields *bibout )
+risin_linkedfile( fields *bibin, int n, newstr *intag, newstr *invalue, int level, param *pm, char *outtag, fields *bibout )
 {
-	int fstatus, n;
+	int fstatus, m;
 	char *p;
 
 	/* if URL is file:///path/to/xyz.pdf, only store "///path/to/xyz.pdf" */
-	n = is_uri_file_scheme( invalue->data );
-	if ( n ) {
+	m = is_uri_file_scheme( invalue->data );
+	if ( m ) {
 		/* skip past "file:" and store only actual path */
-		p = invalue->data + n;
+		p = invalue->data + m;
 		fstatus = fields_add( bibout, outtag, p, level );
 		if ( fstatus==FIELDS_OK ) return BIBL_OK;
 		else return BIBL_ERR_MEMERR;
 	}
 
 	/* if URL is http:, ftp:, etc. store as a URL */
-	n = is_uri_remote_scheme( invalue->data );
-	if ( n!=-1 ) {
+	m = is_uri_remote_scheme( invalue->data );
+	if ( m!=-1 ) {
 		fstatus = fields_add( bibout, "URL", invalue->data, level );
 		if ( fstatus==FIELDS_OK ) return BIBL_OK;
 		else return BIBL_ERR_MEMERR;
@@ -273,7 +271,7 @@ risin_linkedfile( fields *bibin, newstr *intag, newstr *invalue, int level, para
 
 /* scopus puts DOI in the DO or DI tag, but it needs cleaning */
 static int
-risin_doi( fields *bibin, newstr *intag, newstr *invalue, int level, param *pm, char *outtag, fields *bibout )
+risin_doi( fields *bibin, int n, newstr *intag, newstr *invalue, int level, param *pm, char *outtag, fields *bibout )
 {
 	int fstatus, doi;
 	doi = is_doi( invalue->data );
@@ -285,11 +283,11 @@ risin_doi( fields *bibin, newstr *intag, newstr *invalue, int level, param *pm, 
 }
 
 static int
-risin_date( fields *bibin, newstr *intag, newstr *invalue, int level, param *pm, char *outtag, fields *bibout )
+risin_date( fields *bibin, int n, newstr *intag, newstr *invalue, int level, param *pm, char *outtag, fields *bibout )
 {
 	char *p = invalue->data;
-	newstr date;
 	int part, status;
+	newstr date;
 
 	part = ( !strncasecmp( outtag, "PART", 4 ) );
 
@@ -369,13 +367,14 @@ risin_report_notag( param *p, char *tag )
 static int
 risin_convertf( fields *bibin, fields *bibout, int reftype, param *p )
 {
-	static int (*convertfns[NUM_REFTYPES])(fields *, newstr *, newstr *, int, param *, char *, fields *) = {
+	static int (*convertfns[NUM_REFTYPES])(fields *, int, newstr *, newstr *, int, param *, char *, fields *) = {
 		[ 0 ... NUM_REFTYPES-1 ] = generic_null,
 		[ SIMPLE       ] = generic_simple,
 		[ TITLE        ] = generic_title,
 		[ PERSON       ] = generic_person,
 		[ SERIALNO     ] = generic_serialno,
 		[ NOTES        ] = generic_notes,
+		[ URL          ] = generic_url,
 		[ DATE         ] = risin_date,
 		[ DOI          ] = risin_doi,
 		[ LINKEDFILE   ] = risin_linkedfile,
@@ -394,7 +393,7 @@ risin_convertf( fields *bibin, fields *bibout, int reftype, param *p )
 		}
 		invalue = fields_value( bibin, i, FIELDS_STRP );
 
-		status = convertfns[ process ] ( bibin, intag, invalue, level, p, outtag, bibout );
+		status = convertfns[ process ] ( bibin, i, intag, invalue, level, p, outtag, bibout );
 		if ( status!=BIBL_OK ) return status;
 	}
 

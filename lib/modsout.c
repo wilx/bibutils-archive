@@ -1059,7 +1059,7 @@ modsout_report_unused_tags( fields *f, param *p, unsigned long numrefs )
 		for ( i=0; i<n; ++i ) {
 			if ( fields_level( f, i ) != 0 ) continue;
 			tag = fields_tag( f, i, FIELDS_CHRP_NOUSE );
-			if ( strncasecmp( tag, "AUTHOR", 6 ) ) continue;
+			if ( strcasecmp( tag, "AUTHOR" ) && strcasecmp( tag, "AUTHOR:ASIS" ) && strcasecmp( tag, "AUTHOR:CORP" ) ) continue;
 			value = fields_value( f, i, FIELDS_CHRP_NOUSE );
 			if ( nwritten==0 ) fprintf( stderr, "\tAuthor(s) (level=0):\n" );
 			fprintf( stderr, "\t\t'%s'\n", value );

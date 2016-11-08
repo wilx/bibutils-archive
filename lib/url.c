@@ -1,5 +1,5 @@
 /*
- * doi.c
+ * url.c
  *
  * doi_to_url()
  * Handle outputing DOI as a URL (Endnote and RIS formats)
@@ -18,8 +18,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
-#include "newstr.h"
-#include "fields.h"
+#include "bibutils.h"
+#include "url.h"
 
 static void
 construct_url( char *prefix, newstr *id, newstr *id_url, char sep )
@@ -163,4 +163,149 @@ is_embedded_link( char *s )
 	if ( is_reference_database( s ) != -1 ) return 1;
 	if ( is_doi( s ) !=-1 ) return 1;
 	return 0;
+}
+
+typedef struct url_t {
+	char *tag;
+	char *prefix;
+	int offset;
+} url_t;
+
+static url_t prefixes[] = {
+        /*              00000000001111111112222222222333333333344444444445 */
+        /*              12345678901234567890123456789012345678901234567890 */
+	{ "ARXIV",     "http://arxiv.org/abs/",                     21 },
+	{ "DOI",       "http://dx.doi.org/",                        18 },
+	{ "JSTOR",     "http://www.jstor.org/stable/",              28 },
+	{ "MRNUMBER",  "http://www.ams.org/mathscinet-getitem?mr=", 41 },
+	{ "PMID",      "http://www.ncbi.nlm.nih.gov/pubmed/",       35 },
+	{ "PMC",       "http://www.ncbi.nlm.nih.gov/pmc/articles/", 41 },
+	{ "ISIREFNUM", "isi:",                                       4 },
+};
+static int nprefixes = sizeof( prefixes ) / sizeof( prefixes[0] );
+
+/* do not add, but recognize */
+static url_t extraprefixes[] = {
+        /*              00000000001111111112222222222333333333344444444445 */
+        /*              12345678901234567890123456789012345678901234567890 */
+	{ "ARXIV",     "arXiv:",                                     6 },
+	{ "JSTOR",     "jstor:",                                     6 },
+	{ "PMID",      "pmid:",                                      5 },
+	{ "PMID",      "pubmed:",                                    7 },
+	{ "PMC",       "pmc:",                                       4 },
+	{ "URL",       "\\urllink",                                  8 },
+	{ "URL",       "\\url",                                      4 },
+};
+static int nextraprefixes = sizeof( extraprefixes ) / sizeof( extraprefixes[0] );
+
+static int
+find_prefix( char *s, url_t *p, int np )
+{
+	int i;
+
+	for ( i=0; i<np; ++i )
+		if ( !strncmp( p[i].prefix, s, p[i].offset ) ) return i;
+
+	return -1;
+}
+
+int
+urls_split_and_add( char *value_in, fields *out, int lvl_out )
+{
+	int n, fstatus, status = BIBL_OK;
+	char *tag = "URL";
+	int offset = 0;
+
+	n = find_prefix( value_in, prefixes, nprefixes );
+	if ( n!=-1 ) {
+		tag    = prefixes[n].tag;
+		offset = prefixes[n].offset;
+	} else {
+		n = find_prefix( value_in, extraprefixes, nextraprefixes );
+		if ( n!=-1 ) {
+			tag    = extraprefixes[n].tag;
+			offset = extraprefixes[n].offset;
+		}
+	}
+
+	fstatus = fields_add( out, tag, &(value_in[offset]), lvl_out );
+	if ( fstatus!=FIELDS_OK ) status = BIBL_ERR_MEMERR;
+
+	return status;
+}
+
+/* urls_add_type()
+ *
+ * Append urls of a specific type with a specific prefix (which can be empty).
+ * We don't allow duplications here.
+ *
+ */
+static int
+urls_merge_and_add_type( fields *out, char *tag_out, int lvl_out, char *prefix, vplist *values )
+{
+	int i, fstatus, status = BIBL_OK;
+	newstr url;
+
+	newstr_init( &url );
+
+	for ( i=0; i<values->n; ++i ) {
+		newstr_strcpy( &url, prefix );
+		newstr_strcat( &url, ( char * ) vplist_get( values, i ) );
+		fstatus = fields_add( out, tag_out, newstr_cstr( &url ), lvl_out );
+		if ( fstatus!=FIELDS_OK ) {
+			status = BIBL_ERR_MEMERR;
+			goto out;
+		}
+
+	}
+out:
+	newstr_free( &url );
+	return status;
+}
+
+/*
+ * urls_merge_and_add()
+ *
+ * Append urls of types controlled by the list type and automatically append appropriate
+ * prefixes. If no prefix is found for the entry, don't add one (e.g. "URL" entries).
+ *
+ * Control of the types to be added by list type is necessary as some reference formats
+ * like bibtex ought to do special things with DOI, ARXIV, MRNUMBER, and the like.
+ */
+int
+urls_merge_and_add( fields *in, int lvl_in, fields *out, char *tag_out, int lvl_out, list *types )
+{
+	int i, j, status = BIBL_OK;
+	char *tag, *prefix, *empty="";
+	vplist a;
+
+	vplist_init( &a );
+
+	for ( i=0; i<types->n; ++i ) {
+
+		tag = list_getc( types, i );
+
+		/* ...look for data of requested type; if not found skip */
+		vplist_empty( &a );
+		fields_findv_each( in, lvl_in, FIELDS_CHRP, &a, tag );
+		if ( a.n==0 ) continue;
+
+		/* ...find the prefix (if present) */
+		prefix = empty;
+		for ( j=0; j<nprefixes; ++j ) {
+			if ( !strcmp( prefixes[j].tag, tag ) ) {
+				prefix = prefixes[j].prefix;
+				break; /* take the first prefix in the list */
+			}
+		}
+
+		/* ...append all data of this type */
+		status = urls_merge_and_add_type( out, tag_out, lvl_out, prefix, &a );
+		if ( status!=BIBL_OK ) goto out;
+	}
+
+out:
+	vplist_free( &a );
+
+	return status;
 }

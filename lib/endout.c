@@ -14,9 +14,9 @@
 #include "newstr.h"
 #include "strsearch.h"
 #include "fields.h"
-#include "doi.h"
 #include "name.h"
 #include "title.h"
+#include "url.h"
 #include "bibformats.h"
 
 static int  endout_write( fields *in, FILE *fp, param *p, unsigned long refnum );
@@ -502,129 +502,20 @@ append_pages( fields *in, fields *out, int *status )
 }
 
 static void
-append_doi( fields *in, fields *out, int *status )
+append_urls( fields *in, fields *out, int *status )
 {
-	int i, n, fstatus;
-	newstr url;
+	int lstatus;
+	list types;
 
-	newstr_init( &url );
-
-	n = fields_num( in );
-	for ( i=0; i<n; ++i ) {
-		if ( !fields_match_tag( in, i, "DOI" ) ) continue;
-		doi_to_url( in, i, "URL", &url );
-		if ( url.len ) {
-			fstatus = fields_add( out, "%U", newstr_cstr( &url ), LEVEL_MAIN );
-			if ( fstatus!=FIELDS_OK ) *status = BIBL_ERR_MEMERR;
-		}
+	lstatus = list_init_valuesc( &types, "URL", "DOI", "PMID", "PMC", "ARXIV", "JSTOR", "MRNUMBER", NULL );
+	if ( lstatus!=LIST_OK ) {
+		*status = BIBL_ERR_MEMERR;
+		return;
 	}
 
-	newstr_free( &url );
-}
+	*status = urls_merge_and_add( in, LEVEL_ANY, out, "%U", LEVEL_MAIN, &types );
 
-static void
-append_pmc( fields *in, fields *out, int *status )
-{
-	int i, n, fstatus;
-	newstr url;
-
-	newstr_init( &url );
-
-	n = fields_num( in );
-	for ( i=0; i<n; ++i ) {
-		if ( !fields_match_tag( in, i, "PMC" ) ) continue;
-		pmc_to_url( in, i, "URL", &url );
-		if ( url.len ) {
-			fstatus = fields_add( out, "%U", newstr_cstr( &url ), LEVEL_MAIN );
-			if ( fstatus!=FIELDS_OK ) *status = BIBL_ERR_MEMERR;
-		}
-	}
-
-	newstr_free( &url );
-}
-
-static void
-append_pmid( fields *in, fields *out, int *status )
-{
-	int i, n, fstatus;
-	newstr url;
-
-	newstr_init( &url );
-
-	n = fields_num( in );
-	for ( i=0; i<n; ++i ) {
-		if ( !fields_match_tag( in, i, "PMID" ) ) continue;
-		pmid_to_url( in, i, "URL", &url );
-		if ( url.len ) {
-			fstatus = fields_add( out, "%U", newstr_cstr( &url ), LEVEL_MAIN );
-			if ( fstatus!=FIELDS_OK ) *status = BIBL_ERR_MEMERR;
-		}
-	}
-
-	newstr_free( &url );
-}
-
-static void
-append_arxiv( fields *in, fields *out, int *status )
-{
-	int i, n, fstatus;
-	newstr url;
-
-	newstr_init( &url );
-
-	n = fields_num( in );
-	for ( i=0; i<n; ++i ) {
-		if ( !fields_match_tag( in, i, "ARXIV" ) ) continue;
-		arxiv_to_url( in, i, "URL", &url );
-		if ( url.len ) {
-			fstatus = fields_add( out, "%U", newstr_cstr( &url ), LEVEL_MAIN );
-			if ( fstatus!=FIELDS_OK ) *status = BIBL_ERR_MEMERR;
-		}
-	}
-
-	newstr_free( &url );
-}
-
-static void
-append_jstor( fields *in, fields *out, int *status )
-{
-	int i, n, fstatus;
-	newstr url;
-
-	newstr_init( &url );
-
-	n = fields_num( in );
-	for ( i=0; i<n; ++i ) {
-		if ( !fields_match_tag( in, i, "JSTOR" ) ) continue;
-		jstor_to_url( in, i, "URL", &url );
-		if ( url.len ) {
-			fstatus = fields_add( out, "%U", newstr_cstr( &url ), LEVEL_MAIN );
-			if ( fstatus!=FIELDS_OK ) *status = BIBL_ERR_MEMERR;
-		}
-	}
-
-	newstr_free( &url );
-}
-
-static void
-append_mrnumber( fields *in, fields *out, int *status )
-{
-	int i, n, fstatus;
-	newstr url;
-
-	newstr_init( &url );
-
-	n = fields_num( in );
-	for ( i=0; i<n; ++i ) {
-		if ( !fields_match_tag( in, i, "MRNUMBER" ) ) continue;
-		mrnumber_to_url( in, i, "URL", &url );
-		if ( url.len ) {
-			fstatus = fields_add( out, "%U", newstr_cstr( &url ), LEVEL_MAIN );
-			if ( fstatus!=FIELDS_OK ) *status = BIBL_ERR_MEMERR;
-		}
-	}
-
-	newstr_free( &url );
+	list_free( &types );
 }
 
 static void
@@ -812,12 +703,7 @@ append_data( fields *in, fields *out, param *p, unsigned long refnum )
 	append_easyall ( in, "DOI",                "%R", LEVEL_ANY, out, &status );
 	append_easyall ( in, "URL",                "%U", LEVEL_ANY, out, &status );
 	append_easyall ( in, "FILEATTACH",         "%U", LEVEL_ANY, out, &status );
-	append_doi     ( in, out, &status );
-	append_pmid    ( in, out, &status );
-	append_pmc     ( in, out, &status );
-	append_arxiv   ( in, out, &status );
-	append_jstor   ( in, out, &status );
-	append_mrnumber( in, out, &status );
+	append_urls    ( in, out, &status );
 	append_pages   ( in, out, &status );
 
 	return status;

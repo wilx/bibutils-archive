@@ -36,7 +36,8 @@ extern "C" {
 #define BIBL_BIBLATEXIN   (BIBL_FIRSTIN+8)
 #define BIBL_EBIIN        (BIBL_FIRSTIN+9)
 #define BIBL_WORDIN       (BIBL_FIRSTIN+10)
-#define BIBL_LASTIN       (BIBL_FIRSTIN+10)
+#define BIBL_NBIBIN       (BIBL_FIRSTIN+11)
+#define BIBL_LASTIN       (BIBL_FIRSTIN+11)
 
 #define BIBL_FIRSTOUT     (200)
 #define BIBL_MODSOUT      (BIBL_FIRSTOUT)

@@ -1,6 +1,15 @@
 
 BIBUTILS
 
+5.11
+11/8/16
+
+NBIB2XML
++ Add program
+
+BIBTEXOUT
++ Handle MRNUMBER
+
 5.10
 11/2/16
 
