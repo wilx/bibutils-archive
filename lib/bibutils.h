@@ -1,7 +1,7 @@
 /*
  * bibutils.h
  *
- * Copyright (c) Chris Putnam 2005-2016
+ * Copyright (c) Chris Putnam 2005-2017
  *
  * Source code released under GPL version 2
  *
@@ -15,9 +15,9 @@ extern "C" {
 
 #include <stdio.h>
 #include "bibl.h"
-#include "list.h"
+#include "slist.h"
 #include "charsets.h"
-#include "newstr_conv.h"
+#include "str_conv.h"
 
 #define BIBL_OK           (0)
 #define BIBL_ERR_BADINPUT (-1)
@@ -74,9 +74,9 @@ extern "C" {
 #define BIBL_SRC_FILE    (1)  /* value from file, priority over default */
 #define BIBL_SRC_USER    (2)  /* value from user, priority over file, default */
 
-#define BIBL_XMLOUT_FALSE    NEWSTR_CONV_XMLOUT_FALSE
-#define BIBL_XMLOUT_TRUE     NEWSTR_CONV_XMLOUT_TRUE
-#define BIBL_XMLOUT_ENTITIES NEWSTR_CONV_XMLOUT_ENTITIES
+#define BIBL_XMLOUT_FALSE    STR_CONV_XMLOUT_FALSE
+#define BIBL_XMLOUT_TRUE     STR_CONV_XMLOUT_TRUE
+#define BIBL_XMLOUT_ENTITIES STR_CONV_XMLOUT_ENTITIES
 
 typedef unsigned char uchar;
 
@@ -105,13 +105,13 @@ typedef struct param {
 	uchar verbose;
 	uchar singlerefperfile;
 
-	list asis;  /* Names that shouldn't be mangled */
-	list corps; /* Names that shouldn't be mangled-MODS corporation type */
+	slist asis;  /* Names that shouldn't be mangled */
+	slist corps; /* Names that shouldn't be mangled-MODS corporation type */
 
 	char *progname;
 
 
-        int  (*readf)(FILE*,char*,int,int*,newstr*,newstr*,int*);
+        int  (*readf)(FILE*,char*,int,int*,str*,str*,int*);
         int  (*processf)(fields*,char*,char*,long,struct param*);
         int  (*cleanf)(bibl*,struct param*);
         int  (*typef) (fields*,char*,int,struct param*);

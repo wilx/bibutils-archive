@@ -1,7 +1,7 @@
 /*
  * nbibin.c
  *
- * Copyright (c) Chris Putnam 2016
+ * Copyright (c) Chris Putnam 2016-2017
  *
  * Source code released under the GPL version 2
  *
@@ -11,8 +11,8 @@
 #include <string.h>
 #include <ctype.h>
 #include "is_ws.h"
-#include "newstr.h"
-#include "newstr_conv.h"
+#include "str.h"
+#include "str_conv.h"
 #include "fields.h"
 #include "name.h"
 #include "title.h"
@@ -29,7 +29,7 @@ extern int nbib_nall;
  PUBLIC: void nbib_initparams()
 *****************************************************/
 
-static int nbib_readf( FILE *fp, char *buf, int bufsize, int *bufpos, newstr *line, newstr *reference, int *fcharset );
+static int nbib_readf( FILE *fp, char *buf, int bufsize, int *bufpos, str *line, str *reference, int *fcharset );
 static int nbib_processf( fields *nbib, char *p, char *filename, long nref, param *pm );
 static int nbib_typef( fields *nbib, char *filename, int nref, param *p );
 static int nbib_convertf( fields *nbib, fields *info, int reftype, param *p );
@@ -56,8 +56,8 @@ nbibin_initparams( param *p, const char *progname )
 	p->all      = nbib_all;
 	p->nall     = nbib_nall;
 
-	list_init( &(p->asis) );
-	list_init( &(p->corps) );
+	slist_init( &(p->asis) );
+	slist_init( &(p->corps) );
 
 	if ( !progname ) p->progname = NULL;
 	else p->progname = strdup( progname );
@@ -103,20 +103,20 @@ nbib_istag( char *buf )
 }
 
 static int
-readmore( FILE *fp, char *buf, int bufsize, int *bufpos, newstr *line )
+readmore( FILE *fp, char *buf, int bufsize, int *bufpos, str *line )
 {
 	if ( line->len ) return 1;
-	else return newstr_fget( fp, buf, bufsize, bufpos, line );
+	else return str_fget( fp, buf, bufsize, bufpos, line );
 }
 
 static int
-skip_utf8_bom( newstr *line, int *fcharset )
+skip_utf8_bom( str *line, int *fcharset )
 {
 	unsigned char *up;
 
 	if ( line->len < 3 ) return 0;
 
-	up = ( unsigned char *) newstr_cstr( line );
+	up = ( unsigned char *) str_cstr( line );
 	if ( up[0]==0xEF && up[1]==0xBB && up[2]==0xBF ) {
 		*fcharset = CHARSET_UNICODE;
 		return 3;
@@ -126,8 +126,7 @@ skip_utf8_bom( newstr *line, int *fcharset )
 }
 
 static int
-nbib_readf( FILE *fp, char *buf, int bufsize, int *bufpos, newstr *line, 
-		newstr *reference, int *fcharset )
+nbib_readf( FILE *fp, char *buf, int bufsize, int *bufpos, str *line, str *reference, int *fcharset )
 {
 	int n, haveref = 0, inref = 0, readtoofar = 0;
 	char *p;
@@ -164,15 +163,15 @@ nbib_readf( FILE *fp, char *buf, int bufsize, int *bufpos, newstr *line,
 			} else if ( !strncmp(p,"ER  -",5) ) {
 				inref = 0;
 			} else {
-				newstr_addchar( reference, '\n' );
-				newstr_strcat( reference, p );
+				str_addchar( reference, '\n' );
+				str_strcatc( reference, p );
 			}
 		}
 		/* not a tag, but we'll append to last values ...*/
 		else if ( inref && strlen( p ) >= 6 ) {
-			newstr_strcat( reference, p+5 );
+			str_strcatc( reference, p+5 );
 		}
-		if ( !readtoofar ) newstr_empty( line );
+		if ( !readtoofar ) str_empty( line );
 	}
 	if ( inref ) haveref = 1;
 	return haveref;
@@ -183,30 +182,30 @@ nbib_readf( FILE *fp, char *buf, int bufsize, int *bufpos, newstr *line,
 *****************************************************/
 
 static char*
-process_line2( newstr *tag, newstr *data, char *p )
+process_line2( str *tag, str *data, char *p )
 {
 	while ( *p==' ' || *p=='\t' ) p++;
 	while ( *p && *p!='\r' && *p!='\n' )
-		newstr_addchar( data, *p++ );
+		str_addchar( data, *p++ );
 	while ( *p=='\r' || *p=='\n' ) p++;
 	return p;
 }
 
 static char*
-process_line( newstr *tag, newstr *data, char *p )
+process_line( str *tag, str *data, char *p )
 {
 	int i;
 
 	i = 0;
 	while ( i<6 && *p ) {
-		if ( *p!=' ' && *p!='-' ) newstr_addchar( tag, *p );
+		if ( *p!=' ' && *p!='-' ) str_addchar( tag, *p );
 		p++;
 		i++;
 	}
 	while ( *p==' ' || *p=='\t' ) p++;
 	while ( *p && *p!='\r' && *p!='\n' )
-		newstr_addchar( data, *p++ );
-	newstr_trimendingws( data );
+		str_addchar( data, *p++ );
+	str_trimendingws( data );
 	while ( *p=='\n' || *p=='\r' ) p++;
 	return p;
 }
@@ -214,32 +213,32 @@ process_line( newstr *tag, newstr *data, char *p )
 static int
 nbib_processf( fields *nbib, char *p, char *filename, long nref, param *pm )
 {
-	newstr tag, data;
+	str tag, data;
 	int status, n;
 
-	newstrs_init( &tag, &data, NULL );
+	strs_init( &tag, &data, NULL );
 
 	while ( *p ) {
 		if ( nbib_istag( p ) )
 			p = process_line( &tag, &data, p );
 		/* no anonymous fields allowed */
-		if ( tag.len ) {
-			status = fields_add( nbib, tag.data, data.data, 0 );
+		if ( str_has_value( &tag ) ) {
+			status = fields_add( nbib, str_cstr( &tag ), str_cstr( &data ), 0 );
 			if ( status!=FIELDS_OK ) return 0;
 		} else {
 			p = process_line2( &tag, &data, p );
 			n = fields_num( nbib );
 			if ( data.len && n>0 ) {
-				newstr *od;
+				str *od;
 				od = fields_value( nbib, n-1, FIELDS_STRP );
-				newstr_addchar( od, ' ' );
-				newstr_strcat( od, data.data );
+				str_addchar( od, ' ' );
+				str_strcat( od, &data );
 			}
 		}
-		newstrs_empty( &tag, &data, NULL );
+		strs_empty( &tag, &data, NULL );
 	}
 
-	newstrs_free( &tag, &data, NULL );
+	strs_free( &tag, &data, NULL );
 	return 1;
 }
 
@@ -256,8 +255,9 @@ nbib_processf( fields *nbib, char *p, char *filename, long nref, param *pm )
 static int
 nbib_typef( fields *nbib, char *filename, int nref, param *p )
 {
-	int i, reftype, nrefname, is_default;
+	int reftype, nrefname, is_default;
 	char *typename, *refname = "";
+	vplist_index i;
 	vplist a;
 
 	nrefname  = fields_find( nbib, "PMID", LEVEL_MAIN );
@@ -293,81 +293,103 @@ nbib_typef( fields *nbib, char *filename, int nref, param *p )
 /* PB  - 2016 May 7 */
 
 static int
-nbibin_date( fields *bibin, int n, newstr *intag, newstr *invalue, int level, param *pm, char *outtag, fields *bibout )
+nbibin_date( fields *bibin, int n, str *intag, str *invalue, int level, param *pm, char *outtag, fields *bibout )
 {
 	int fstatus, status = BIBL_OK;
-	newstr s;
+	str s;
 	char *p;
 
-	p = newstr_cstr( invalue );
+	p = str_cstr( invalue );
 	if ( !p ) return status;
 
-	newstr_init( &s );
+	str_init( &s );
 
 	/* ...handle year */
-	while ( *p && !is_ws( *p ) ) {
-		newstr_addchar( &s, *p );
-		p++;
-	}
-	if ( s.len ) {
-		fstatus = fields_add( bibout, "DATE:YEAR", newstr_cstr( &s ), LEVEL_MAIN );
-		if ( fstatus!=FIELDS_OK ) {
+		while ( *p && !is_ws( *p ) ) {
+			str_addchar( &s, *p );
+			p++;
+		}
+
+		if ( str_memerr( &s ) ) {
 			status = BIBL_ERR_MEMERR;
 			goto out;
 		}
-	}
+
+		if ( str_has_value( &s ) ) {
+			fstatus = fields_add( bibout, "DATE:YEAR", str_cstr( &s ), LEVEL_MAIN );
+			if ( fstatus!=FIELDS_OK ) {
+				status = BIBL_ERR_MEMERR;
+				goto out;
+			}
+		}
 
 	/* ...handle month */
-	newstr_empty( &s );
-	while ( is_ws( *p ) ) p++;
-	while ( *p && !is_ws( *p ) ) {
-		newstr_addchar( &s, *p );
-		p++;
-	}
-	if ( s.len ) {
-		fstatus = fields_add( bibout, "DATE:MONTH", newstr_cstr( &s ), LEVEL_MAIN );
-		if ( fstatus!=FIELDS_OK ) {
+		str_empty( &s );
+		while ( is_ws( *p ) ) p++;
+		while ( *p && !is_ws( *p ) ) {
+			str_addchar( &s, *p );
+			p++;
+		}
+
+		if ( str_memerr( &s ) ) {
 			status = BIBL_ERR_MEMERR;
 			goto out;
 		}
-	}
+
+		if ( str_has_value( &s ) ) {
+			fstatus = fields_add( bibout, "DATE:MONTH", str_cstr( &s ), LEVEL_MAIN );
+			if ( fstatus!=FIELDS_OK ) {
+				status = BIBL_ERR_MEMERR;
+				goto out;
+			}
+		}
 
 	/* ...handle day */
-	newstr_empty( &s );
-	while ( is_ws( *p ) ) p++;
-	while ( *p && !is_ws( *p ) ) {
-		newstr_addchar( &s, *p );
-		p++;
-	}
-	if ( s.len ) {
-		fstatus = fields_add( bibout, "DATE:DAY", newstr_cstr( &s ), LEVEL_MAIN );
-		if ( fstatus!=FIELDS_OK ) {
+		str_empty( &s );
+		while ( is_ws( *p ) ) p++;
+		while ( *p && !is_ws( *p ) ) {
+			str_addchar( &s, *p );
+			p++;
+		}
+
+		if ( str_memerr( &s ) ) {
 			status = BIBL_ERR_MEMERR;
 			goto out;
 		}
-	}
+
+		if ( str_has_value( &s ) ) {
+			fstatus = fields_add( bibout, "DATE:DAY", str_cstr( &s ), LEVEL_MAIN );
+			if ( fstatus!=FIELDS_OK ) {
+				status = BIBL_ERR_MEMERR;
+				goto out;
+			}
+		}
 
 out:
-	newstr_free( &s );
+	str_free( &s );
 
 	return status;
 }
 
 /* the LID and AID fields that can be doi's or pii's */
 static int
-nbibin_doi( fields *bibin, int n, newstr *intag, newstr *invalue, int level, param *pm, char *outtag, fields *bibout )
+nbibin_doi( fields *bibin, int n, str *intag, str *invalue, int level, param *pm, char *outtag, fields *bibout )
 {
-	int fstatus, status = BIBL_OK;
+	int fstatus, sstatus, status = BIBL_OK;
 	char *id, *type, *usetag="";
-	list tokens;
+	slist tokens;
 
-	list_init( &tokens );
+	slist_init( &tokens );
 
-	list_tokenize( &tokens, invalue, " ", 1 );
+	sstatus = slist_tokenize( &tokens, invalue, " ", 1 );
+	if ( sstatus!=SLIST_OK ) {
+		status = BIBL_ERR_MEMERR;
+		goto out;
+	}
 
 	if ( tokens.n == 2 ) {
-		id   = list_getc( &tokens, 0 );
-		type = list_getc( &tokens, 1 );
+		id   = slist_cstr( &tokens, 0 );
+		type = slist_cstr( &tokens, 1 );
 		if ( !strcmp( type, "[doi]" ) ) usetag = "DOI";
 		else if ( !strcmp( type, "[pii]" ) ) usetag = "PII";
 		if ( strlen( outtag ) > 0 ) {
@@ -379,39 +401,42 @@ nbibin_doi( fields *bibin, int n, newstr *intag, newstr *invalue, int level, par
 		}
 	}
 out:
-	list_free( &tokens );
+	slist_free( &tokens );
 	return status;
 }
 
 static int
-nbibin_pages( fields *bibin, int n, newstr *intag, newstr *invalue, int level, param *pm, char *outtag, fields *bibout )
+nbibin_pages( fields *bibin, int n, str *intag, str *invalue, int level, param *pm, char *outtag, fields *bibout )
 {
 	int fstatus, status = BIBL_OK;
-	newstr sp, tmp, ep;
+	str sp, tmp, ep;
 	char *p;
 	int i;
 
-	p = newstr_cstr( invalue );
+	p = str_cstr( invalue );
 	if ( !p ) return BIBL_OK;
 
-	newstr_init( &sp );
-	newstr_init( &tmp );
-	newstr_init( &ep );
+	strs_init( &sp, &tmp, &ep, NULL );
 
 	while ( *p && *p!='-' ) {
-		newstr_addchar( &sp, *p );
+		str_addchar( &sp, *p );
 		p++;
+	}
+
+	if ( str_memerr( &sp ) ) {
+		status = BIBL_ERR_MEMERR;
+		goto out;
 	}
 
 	while ( *p=='-' ) p++;
 
 	while ( *p ) {
-		newstr_addchar( &tmp, *p );
+		str_addchar( &tmp, *p );
 		p++;
 	}
 
 	if ( sp.len ) {
-		fstatus = fields_add( bibout, "PAGES:START", newstr_cstr( &sp ), LEVEL_MAIN );
+		fstatus = fields_add( bibout, "PAGES:START", str_cstr( &sp ), LEVEL_MAIN );
 		if ( fstatus!=FIELDS_OK ) {
 			status = BIBL_ERR_MEMERR;
 			goto out;
@@ -420,19 +445,17 @@ nbibin_pages( fields *bibin, int n, newstr *intag, newstr *invalue, int level, p
 
 	if ( tmp.len ) {
 		for ( i=0; i<sp.len - tmp.len; ++i )
-			newstr_addchar( &ep, sp.data[i] );
-		newstr_newstrcat( &ep, &tmp );
+			str_addchar( &ep, sp.data[i] );
+		str_strcat( &ep, &tmp );
 
-		fstatus = fields_add( bibout, "PAGES:STOP", newstr_cstr( &ep ), LEVEL_MAIN );
+		fstatus = fields_add( bibout, "PAGES:STOP", str_cstr( &ep ), LEVEL_MAIN );
 		if ( fstatus!=FIELDS_OK ) {
 			status = BIBL_ERR_MEMERR;
 			goto out;
 		}
 	}
 out:
-	newstr_free( &sp );
-	newstr_free( &tmp );
-	newstr_free( &ep );
+	strs_free( &sp, &tmp, &ep, NULL );
 	return status;
 }
 
@@ -448,7 +471,7 @@ nbib_report_notag( param *p, char *tag )
 static int
 nbib_convertf( fields *bibin, fields *bibout, int reftype, param *p )
 {
-	static int (*convertfns[NUM_REFTYPES])(fields *, int i, newstr *, newstr *, int, param *, char *, fields *) = {
+	static int (*convertfns[NUM_REFTYPES])(fields *, int i, str *, str *, int, param *, char *, fields *) = {
 		[ 0 ... NUM_REFTYPES-1 ] = generic_null,
 		[ SIMPLE       ] = generic_simple,
 		[ TITLE        ] = generic_title,
@@ -459,7 +482,7 @@ nbib_convertf( fields *bibin, fields *bibout, int reftype, param *p )
 		[ DOI          ] = nbibin_doi,
         };
 	int process, level, i, nfields, status = BIBL_OK;
-	newstr *intag, *invalue;
+	str *intag, *invalue;
 	char *outtag;
 
 	nfields = fields_num( bibin );

@@ -1,7 +1,7 @@
 /*
  * endout.c
  *
- * Copyright (c) Chris Putnam 2004-2016
+ * Copyright (c) Chris Putnam 2004-2017
  *
  * Program and source code released under the GPL version 2
  *
@@ -11,7 +11,7 @@
 #include <string.h>
 #include <ctype.h>
 #include "utf8.h"
-#include "newstr.h"
+#include "str.h"
 #include "strsearch.h"
 #include "fields.h"
 #include "name.h"
@@ -435,21 +435,25 @@ static int
 append_title( fields *in, char *full, char *sub, char *endtag,
 		int level, fields *out, int *status )
 {
-	newstr *mainttl = fields_findv( in, level, FIELDS_STRP, full );
-	newstr *subttl  = fields_findv( in, level, FIELDS_STRP, sub );
-	newstr fullttl;
+	str *mainttl = fields_findv( in, level, FIELDS_STRP, full );
+	str *subttl  = fields_findv( in, level, FIELDS_STRP, sub );
+	str fullttl;
 	int fstatus;
 
-	newstr_init( &fullttl );
+	str_init( &fullttl );
 	title_combine( &fullttl, mainttl, subttl );
 
-	if ( fullttl.len ) {
-		fstatus = fields_add( out, endtag, newstr_cstr( &fullttl ), LEVEL_MAIN );
-		if ( fstatus!=FIELDS_OK ) *status = BIBL_ERR_MEMERR;
+	if ( str_memerr( &fullttl ) ) {
+		*status = BIBL_ERR_MEMERR;
+		goto out;
 	}
 
-	newstr_free( &fullttl );
-
+	if ( str_has_value( &fullttl ) ) {
+		fstatus = fields_add( out, endtag, str_cstr( &fullttl ), LEVEL_MAIN );
+		if ( fstatus!=FIELDS_OK ) *status = BIBL_ERR_MEMERR;
+	}
+out:
+	str_free( &fullttl );
 	return 1;
 }
 
@@ -457,10 +461,10 @@ static void
 append_people( fields *in, char *tag, char *entag, int level, fields *out, int *status )
 {
 	int i, n, flvl, fstatus;
-	newstr oneperson;
+	str oneperson;
 	char *ftag;
 
-	newstr_init( &oneperson );
+	str_init( &oneperson );
 	n = fields_num( in );
 	for ( i=0; i<n; ++i ) {
 		flvl = fields_level( in, i );
@@ -468,30 +472,32 @@ append_people( fields *in, char *tag, char *entag, int level, fields *out, int *
 		ftag = fields_tag( in, i, FIELDS_CHRP );
 		if ( !strcasecmp( ftag, tag ) ) {
 			name_build_withcomma( &oneperson, fields_value( in, i, FIELDS_CHRP ) );
-			fstatus = fields_add_can_dup( out, entag, newstr_cstr( &oneperson ), LEVEL_MAIN );
+			fstatus = fields_add_can_dup( out, entag, str_cstr( &oneperson ), LEVEL_MAIN );
 			if ( fstatus!=FIELDS_OK ) *status = BIBL_ERR_MEMERR;
 		}
 	}
-	newstr_free( &oneperson );
+	str_free( &oneperson );
 }
 
 static void
 append_pages( fields *in, fields *out, int *status )
 {
-	char *ar, *sn, *en;
-	newstr pages;
+	str *sn, *en;
 	int fstatus;
+	str pages;
+	char *ar;
 
-	sn = fields_findv( in, LEVEL_ANY, FIELDS_CHRP, "PAGES:START" );
-	en = fields_findv( in, LEVEL_ANY, FIELDS_CHRP, "PAGES:STOP" );
+	sn = fields_findv( in, LEVEL_ANY, FIELDS_STRP, "PAGES:START" );
+	en = fields_findv( in, LEVEL_ANY, FIELDS_STRP, "PAGES:STOP" );
 	if ( sn || en ) {
-		newstr_init( &pages );
-		if ( sn ) newstr_strcpy( &pages, sn );
-		if ( sn && en ) newstr_strcat( &pages, "-" );
-		if ( en ) newstr_strcat( &pages, en );
-		fstatus = fields_add( out, "%P", newstr_cstr( &pages ), LEVEL_MAIN );
+		str_init( &pages );
+		if ( sn ) str_strcpy( &pages, sn );
+		if ( sn && en ) str_strcatc( &pages, "-" );
+		if ( en ) str_strcat( &pages, en );
+		if ( str_memerr( &pages ) ) { *status = BIBL_ERR_MEMERR; str_free( &pages ); return; }
+		fstatus = fields_add( out, "%P", str_cstr( &pages ), LEVEL_MAIN );
 		if ( fstatus!=FIELDS_OK ) *status = BIBL_ERR_MEMERR;
-		newstr_free( &pages );
+		str_free( &pages );
 	} else {
 		ar = fields_findv( in, LEVEL_ANY, FIELDS_CHRP, "ARTICLENUMBER" );
 		if ( ar ) {
@@ -505,17 +511,17 @@ static void
 append_urls( fields *in, fields *out, int *status )
 {
 	int lstatus;
-	list types;
+	slist types;
 
-	lstatus = list_init_valuesc( &types, "URL", "DOI", "PMID", "PMC", "ARXIV", "JSTOR", "MRNUMBER", NULL );
-	if ( lstatus!=LIST_OK ) {
+	lstatus = slist_init_valuesc( &types, "URL", "DOI", "PMID", "PMC", "ARXIV", "JSTOR", "MRNUMBER", NULL );
+	if ( lstatus!=SLIST_OK ) {
 		*status = BIBL_ERR_MEMERR;
 		return;
 	}
 
 	*status = urls_merge_and_add( in, LEVEL_ANY, out, "%U", LEVEL_MAIN, &types );
 
-	list_free( &types );
+	slist_free( &types );
 }
 
 static void
@@ -539,23 +545,23 @@ append_monthday( fields *in, fields *out, int *status )
 		"November", "December" };
 	char *month, *day;
 	int m, fstatus;
-	newstr monday;
+	str monday;
 
-	newstr_init( &monday );
+	str_init( &monday );
 	month = fields_findv_firstof( in, LEVEL_ANY, FIELDS_CHRP, "DATE:MONTH", "PARTDATE:MONTH", NULL );
 	day   = fields_findv_firstof( in, LEVEL_ANY, FIELDS_CHRP, "DATE:DAY",   "PARTDATE:DAY",   NULL );
 	if ( month || day ) {
 		if ( month ) {
 			m = atoi( month );
-			if ( m>0 && m<13 ) newstr_strcpy( &monday, months[m-1] );
-			else newstr_strcpy( &monday, month );
+			if ( m>0 && m<13 ) str_strcpyc( &monday, months[m-1] );
+			else str_strcpyc( &monday, month );
 		}
-		if ( month && day ) newstr_strcat( &monday, " " );
-		if ( day ) newstr_strcat( &monday, day );
-		fstatus = fields_add( out, "%8", newstr_cstr( &monday ), LEVEL_MAIN );
+		if ( month && day ) str_strcatc( &monday, " " );
+		if ( day ) str_strcatc( &monday, day );
+		fstatus = fields_add( out, "%8", str_cstr( &monday ), LEVEL_MAIN );
 		if ( fstatus!=FIELDS_OK ) *status = BIBL_ERR_MEMERR;
 	}
-	newstr_free( &monday );
+	str_free( &monday );
 }
 
 static void
@@ -588,7 +594,8 @@ append_thesishint( int type, fields *out, int *status )
 static void
 append_easyall( fields *in, char *tag, char *entag, int level, fields *out, int *status )
 {
-	int i, fstatus;
+	vplist_index i;
+	int fstatus;
 	vplist a;
 	vplist_init( &a );
 	fields_findv_each( in, level, FIELDS_CHRP, &a, tag );

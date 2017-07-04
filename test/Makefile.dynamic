@@ -8,8 +8,9 @@ LDLIBS   = -lbibutils
 
 PROGS    = doi_test \
            entities_test \
-           list_test \
-           newstr_test \
+           intlist_test \
+           slist_test \
+           str_test \
            utf8_test
 
 all: $(PROGS)
@@ -23,19 +24,23 @@ utf8_test : utf8_test.o
 doi_test : doi_test.o
 	$(CC) $(LDFLAGS) $^ $(LOADLIBES) $(LDLIBS) -o $@
 
-newstr_test : newstr_test.o
+str_test : str_test.o
 	$(CC) $(LDFLAGS) $^ $(LOADLIBES) $(LDLIBS) -o $@
 
-list_test : list_test.o
+slist_test : slist_test.o
+	$(CC) $(LDFLAGS) $^ $(LOADLIBES) $(LDLIBS) -o $@
+
+intlist_test : intlist_test.o
 	$(CC) $(LDFLAGS) $^ $(LOADLIBES) $(LDLIBS) -o $@
 
 test: $(PROGS) FORCE
 	( LD_LIBRARY_PATH="../lib"; \
 	export LD_LIBRARY_PATH ; \
-	./newstr_test; \
-	./list_test; \
+	./str_test; \
+	./slist_test; \
+	./intlist_test; \
 	./entities_test; \
-	./utf8_test;
+	./utf8_test; \
 	./doi_test )
 
 clean:

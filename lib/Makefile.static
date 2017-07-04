@@ -7,14 +7,14 @@ SIMPLE_OBJS   = charsets.o \
 NEWSTR_OBJS   = entities.o \
                 gb18030.o \
                 latex.o \
-                newstr.o \
-                newstr_conv.o \
+                str.o \
+                str_conv.o \
                 unicode.o \
                 utf8.o
 
 CONTAIN_OBJS  = fields.o \
                 intlist.o \
-                list.o \
+                slist.o \
                 vplist.o \
                 xml.o \
                 xml_encoding.o
@@ -42,12 +42,15 @@ INPUT_OBJS    = bibtexin.o \
 		endin.o \
                 endtypes.o \
 		endxmlin.o \
+		generic.o \
 		isiin.o \
                 isitypes.o \
                 marc.o \
 		medin.o \
 		modsin.o \
                 modstypes.o \
+		nbibin.o \
+		nbibtypes.o \
 		risin.o \
                 ristypes.o \
 		wordin.o

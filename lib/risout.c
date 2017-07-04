@@ -1,7 +1,7 @@
 /*
  * risout.c
  *
- * Copyright (c) Chris Putnam 2003-2016
+ * Copyright (c) Chris Putnam 2003-2017
  *
  * Source code released under the GPL version 2
  *
@@ -11,7 +11,7 @@
 #include <string.h>
 #include <ctype.h>
 #include "utf8.h"
-#include "newstr.h"
+#include "str.h"
 #include "strsearch.h"
 #include "fields.h"
 #include "name.h"
@@ -232,7 +232,8 @@ get_type_resource( fields *f, param *p )
 		{ "cartographic",              TYPE_MAP     },
 	};
 	int nmatch_res = sizeof( match_res ) / sizeof( match_res[0] );
-	int type, i, j;
+	vplist_index i;
+	int type, j;
 	char *value;
 	vplist a;
 
@@ -265,13 +266,13 @@ get_type_issuance( fields *f, param *p )
 	int i, monographic = 0, monographic_level = 0;
 //	int text = 0;
 	for ( i=0; i<f->n; ++i ) {
-		if ( !strcasecmp( f->tag[i].data, "issuance" ) &&
-		     !strcasecmp( f->data[i].data, "MONOGRAPHIC" ) ){
+		if ( !strcasecmp( (char *) fields_tag( f, i, FIELDS_CHRP_NOUSE ), "issuance" ) &&
+		     !strcasecmp( (char *) fields_value( f, i, FIELDS_CHRP_NOUSE ), "MONOGRAPHIC" ) ){
 			monographic = 1;
 			monographic_level = f->level[i];
 		}
-//		if ( !strcasecmp( f->tag[i].data, "typeOfResource" ) &&
-//		     !strcasecmp( f->data[i].data,"text") ) {
+//		if ( !strcasecmp( (char *) fields_tag( f, i, FIELDS_CHRP_NOUSE ), "typeOfResource" ) &&
+//		     !strcasecmp( (char *) fields_value( f, i, FIELDS_CHRP_NOUSE ), "text" ) ) {
 //			text = 1;
 //		}
 	}
@@ -360,27 +361,30 @@ append_type( int type, param *p, fields *out, int *status )
 static void
 append_people( fields *f, char *tag, char *ristag, int level, fields *out, int *status )
 {
-	newstr oneperson;
-	int i, fstatus;
+	vplist_index i;
+	str oneperson;
 	vplist people;
+	int fstatus;
 
-	newstr_init( &oneperson );
+	str_init( &oneperson );
 	vplist_init( &people );
 	fields_findv_each( f, level, FIELDS_CHRP, &people, tag );
 	for ( i=0; i<people.n; ++i ) {
 		name_build_withcomma( &oneperson, ( char * ) vplist_get( &people, i ) );
-		fstatus = fields_add_can_dup( out, ristag, newstr_cstr( &oneperson ), LEVEL_MAIN );
-		if ( fstatus!=FIELDS_OK ) *status = BIBL_ERR_MEMERR;
+		if ( str_memerr( &oneperson ) ) { *status = BIBL_ERR_MEMERR; goto out; }
+		fstatus = fields_add_can_dup( out, ristag, str_cstr( &oneperson ), LEVEL_MAIN );
+		if ( fstatus!=FIELDS_OK ) { *status = BIBL_ERR_MEMERR; goto out; }
 	}
+out:
 	vplist_free( &people );
-	newstr_free( &oneperson );
+	str_free( &oneperson );
 }
 
 static void
 append_date( fields *in, fields *out, int *status )
 {
 	char *year, *month, *day;
-	newstr date;
+	str date;
 	int fstatus;
 
 	year  = fields_findv_firstof( in, LEVEL_ANY, FIELDS_CHRP, "DATE:YEAR",  "PARTDATE:YEAR",  NULL );
@@ -393,39 +397,47 @@ append_date( fields *in, fields *out, int *status )
 	}
 
 	if ( year || month || day ) {
-		newstr_init( &date );
+		str_init( &date );
 
-		if ( year ) newstr_strcat( &date, year );
-		newstr_addchar( &date, '/' );
-		if ( month ) newstr_strcat( &date, month );
-		newstr_addchar( &date, '/' );
-		if ( day ) newstr_strcat( &date, day );
+		if ( year ) str_strcatc( &date, year );
+		str_addchar( &date, '/' );
+		if ( month ) str_strcatc( &date, month );
+		str_addchar( &date, '/' );
+		if ( day ) str_strcatc( &date, day );
 
-		fstatus = fields_add( out, "DA", newstr_cstr( &date ), LEVEL_MAIN );
+		if ( str_memerr( &date ) ) { *status = BIBL_ERR_MEMERR; str_free( &date ); return; }
+
+		fstatus = fields_add( out, "DA", str_cstr( &date ), LEVEL_MAIN );
 		if ( fstatus!=FIELDS_OK ) *status = BIBL_ERR_MEMERR;
 
-		newstr_free( &date );
+		str_free( &date );
 	}
 }
 
 static void
 append_titlecore( fields *in, char *ristag, int level, char *maintag, char *subtag, fields *out, int *status )
 {
-	newstr *mainttl = fields_findv( in, level, FIELDS_STRP, maintag );
-	newstr *subttl  = fields_findv( in, level, FIELDS_STRP, subtag );
-	newstr fullttl;
+	str *mainttl = fields_findv( in, level, FIELDS_STRP, maintag );
+	str *subttl  = fields_findv( in, level, FIELDS_STRP, subtag );
+	str fullttl;
 	int fstatus;
 
-	newstr_init( &fullttl );
+	str_init( &fullttl );
 
 	title_combine( &fullttl, mainttl, subttl );
 
-	if ( fullttl.len ) {
-		fstatus = fields_add( out, ristag, newstr_cstr( &fullttl ), LEVEL_MAIN );
+	if ( str_memerr( &fullttl ) ) {
+		*status = BIBL_ERR_MEMERR;
+		goto out;
+	}
+
+	if ( str_has_value( &fullttl ) ) {
+		fstatus = fields_add( out, ristag, str_cstr( &fullttl ), LEVEL_MAIN );
 		if ( fstatus!=FIELDS_OK ) *status = BIBL_ERR_MEMERR;
 	}
 
-	newstr_free( &fullttl );
+out:
+	str_free( &fullttl );
 }
 
 static void
@@ -473,7 +485,8 @@ append_pages( fields *in, fields *out, int *status )
 static void
 append_keywords( fields *in, fields *out, int *status )
 {
-	int i, fstatus;
+	vplist_index i;
+	int fstatus;
 	vplist vpl;
 
 	vplist_init( &vpl );
@@ -489,17 +502,17 @@ static void
 append_urls( fields *in, fields *out, int *status )
 {
 	int lstatus;
-	list types;
+	slist types;
 
-	lstatus = list_init_valuesc( &types, "URL", "PMID", "PMC", "ARXIV", "JSTOR", "MRNUMBER", NULL );
-	if ( lstatus!=LIST_OK ) {
+	lstatus = slist_init_valuesc( &types, "URL", "PMID", "PMC", "ARXIV", "JSTOR", "MRNUMBER", NULL );
+	if ( lstatus!=SLIST_OK ) {
 		*status = BIBL_ERR_MEMERR;
 		return;
 	}
 
 	*status = urls_merge_and_add( in, LEVEL_ANY, out, "UR", LEVEL_MAIN, &types );
 
-	list_free( &types );
+	slist_free( &types );
 
 }
 
@@ -550,24 +563,27 @@ is_uri_scheme( char *p )
 static void
 append_file( fields *in, char *tag, char *ristag, int level, fields *out, int *status )
 {
-	newstr filename;
-	int i, fstatus;
+	vplist_index i;
+	str filename;
+	int fstatus;
 	vplist a;
 	char *fl;
 
-	newstr_init( &filename );
+	str_init( &filename );
 	vplist_init( &a );
 	fields_findv_each( in, level, FIELDS_CHRP, &a, tag );
 	for ( i=0; i<a.n; ++i ) {
 		fl = ( char * ) vplist_get( &a, i );
-		newstr_empty( &filename );
-		if ( !is_uri_scheme( fl ) ) newstr_strcat( &filename, "file:" );
-		newstr_strcat( &filename, fl );
-		fstatus = fields_add( out, ristag, newstr_cstr( &filename ), LEVEL_MAIN );
-		if ( fstatus!=FIELDS_OK ) *status = BIBL_ERR_MEMERR;
+		str_empty( &filename );
+		if ( !is_uri_scheme( fl ) ) str_strcatc( &filename, "file:" );
+		str_strcatc( &filename, fl );
+		if ( str_memerr( &filename ) ) { *status = BIBL_ERR_MEMERR; goto out; }
+		fstatus = fields_add( out, ristag, str_cstr( &filename ), LEVEL_MAIN );
+		if ( fstatus!=FIELDS_OK ) { *status = BIBL_ERR_MEMERR; goto out; }
 	}
+out:
 	vplist_free( &a );
-	newstr_free( &filename );
+	str_free( &filename );
 }
 
 static void
@@ -586,7 +602,8 @@ append_easy( fields *in, char *tag, char *ristag, int level, fields *out, int *s
 static void
 append_easyall( fields *in, char *tag, char *ristag, int level, fields *out, int *status )
 {
-	int i, fstatus;
+	vplist_index i;
+	int fstatus;
 	vplist a;
 
 	vplist_init( &a );

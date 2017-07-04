@@ -1,7 +1,7 @@
 /*
  * fields.h
  *
- * Copyright (c) Chris Putnam 2003-2016
+ * Copyright (c) Chris Putnam 2003-2017
  *
  * Source code released under the GPL version 2
  *
@@ -20,12 +20,12 @@
 #define LEVEL_ORIG (-2)
 
 #include <stdarg.h>
-#include "newstr.h"
+#include "str.h"
 #include "vplist.h"
 
 typedef struct fields {
-	newstr    *tag;
-	newstr    *data;
+	str       *tag;
+	str       *data;
 	int       *used;
 	int       *level;
 	int       n;

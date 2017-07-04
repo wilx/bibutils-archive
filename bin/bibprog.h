@@ -1,7 +1,7 @@
 /*
  * bibprogs.h
  *
- * Copyright (c) Chris Putnam 2008-2016
+ * Copyright (c) Chris Putnam 2008-2017
  *
  * Program and source code released under the GPL version 2
  *

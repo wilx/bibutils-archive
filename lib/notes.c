@@ -1,5 +1,10 @@
 /*
  * notes.c
+ *
+ * Copyright (c) Chris Putnam 2016-2017
+ *
+ * Program and source code released under the GPL version 2
+ *
  */
 #include <string.h>
 #include "url.h"
@@ -21,7 +26,7 @@ typedef struct url_t {
 } url_t;
 
 static void
-notes_added_url( fields *bibout, newstr *invalue, int level, int *ok )
+notes_added_url( fields *bibout, str *invalue, int level, int *ok )
 {
 	url_t prefixes[] = {
 		{ "arXiv:",                                    "ARXIV",     6 },
@@ -61,7 +66,7 @@ notes_added_url( fields *bibout, newstr *invalue, int level, int *ok )
 }
 
 static int
-notes_added_doi( fields *bibout, newstr *invalue, int level, int *ok )
+notes_added_doi( fields *bibout, str *invalue, int level, int *ok )
 {
 	int doi, fstatus;
 
@@ -77,7 +82,7 @@ notes_added_doi( fields *bibout, newstr *invalue, int level, int *ok )
 }
 
 int
-notes_add( fields *bibout, newstr *invalue, int level )
+notes_add( fields *bibout, str *invalue, int level )
 {
 	int fstatus, done = 0, ok = 1;
 

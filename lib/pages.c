@@ -1,5 +1,9 @@
 /*
  * pages.c
+ *
+ * Copyright (c) Chris Putnam 2016-2017
+ *
+ * Program and source code released under GPL verison 2
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -19,20 +23,20 @@
  * " 107 111"
  */
 static void
-extract_range( newstr *input, newstr *begin, newstr *end )
+extract_range( str *input, str *begin, str *end )
 {
 	/* -30 is the first character of a UTF8 em-dash and en-dash */
 	const char terminators[] = { ' ', '-', '\t', '\r', '\n', -30, '\0' };
 	char *p;
 
-	newstr_empty( begin );
-	newstr_empty( end );
+	str_empty( begin );
+	str_empty( end );
 
 	if ( input->len==0 ) return;
 
 	p = skip_ws( input->data );
 	while ( *p && !strchr( terminators, *p ) )
-		newstr_addchar( begin, *p++ );
+		str_addchar( begin, *p++ );
 
 	p = skip_ws( p );
 
@@ -43,21 +47,21 @@ extract_range( newstr *input, newstr *begin, newstr *end )
 	p = skip_ws( p );
 
 	while ( *p && !strchr( terminators, *p ) )
-		newstr_addchar( end, *p++ );
+		str_addchar( end, *p++ );
 }
 
 int
-pages_add( fields *bibout, char *outtag, newstr *invalue, int level )
+pages_add( fields *bibout, char *outtag, str *invalue, int level )
 {
 	int fstatus, status = 1;
-	newstr start, stop;
+	str start, stop;
 
-	newstr_init( &start );
-	newstr_init( &stop );
+	str_init( &start );
+	str_init( &stop );
 
 	extract_range( invalue, &start, &stop );
 
-	if ( newstr_memerr( &start ) || newstr_memerr( &stop ) ) {
+	if ( str_memerr( &start ) || str_memerr( &stop ) ) {
 		status = 0;
 		goto out;
 	}
@@ -76,8 +80,8 @@ pages_add( fields *bibout, char *outtag, newstr *invalue, int level )
 	}
 
 out:
-	newstr_free( &start );
-	newstr_free( &stop );
+	str_free( &start );
+	str_free( &stop );
 	return status;
 }
 

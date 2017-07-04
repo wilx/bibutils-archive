@@ -18,7 +18,7 @@
   <!ENTITY debian      "<productname>Debian</productname>">
   <!ENTITY gnu         "<acronym>GNU</acronym>">
   <!ENTITY gpl         "&gnu; <acronym>GPL</acronym>">
-  <!ENTITY version	"5.11">
+  <!ENTITY version	"6.0">
 
   ]>
 <refentry>

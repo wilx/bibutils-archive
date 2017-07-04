@@ -1,7 +1,7 @@
 /*
  * isiout.c
  *
- * Copyright (c) Chris Putnam 2008-2016
+ * Copyright (c) Chris Putnam 2008-2017
  *
  * Source code released under the GPL version 2
  *
@@ -11,7 +11,7 @@
 #include <string.h>
 #include <ctype.h>
 #include "utf8.h"
-#include "newstr.h"
+#include "str.h"
 #include "strsearch.h"
 #include "fields.h"
 #include "title.h"
@@ -97,20 +97,25 @@ append_type( int type, fields *out, int *status )
 static void
 append_titlecore( fields *in, char *isitag, int level, char *maintag, char *subtag, fields *out, int *status )
 {
-	newstr *mainttl = fields_findv( in, level, FIELDS_STRP, maintag );
-	newstr *subttl  = fields_findv( in, level, FIELDS_STRP, subtag );
-	newstr fullttl;
+	str *mainttl = fields_findv( in, level, FIELDS_STRP, maintag );
+	str *subttl  = fields_findv( in, level, FIELDS_STRP, subtag );
+	str fullttl;
 	int fstatus;
 
-	newstr_init( &fullttl );
+	str_init( &fullttl );
 	title_combine( &fullttl, mainttl, subttl );
 
-	if ( fullttl.len ) {
-		fstatus = fields_add( out, isitag, newstr_cstr( &fullttl ), LEVEL_MAIN );
-		if ( fstatus!=FIELDS_OK ) *status = BIBL_ERR_MEMERR;
+	if ( str_memerr( &fullttl ) ) {
+		*status = BIBL_ERR_MEMERR;
+		goto out;
 	}
 
-	newstr_free( &fullttl );
+	if ( str_has_value( &fullttl ) ) {
+		fstatus = fields_add( out, isitag, str_cstr( &fullttl ), LEVEL_MAIN );
+		if ( fstatus!=FIELDS_OK ) *status = BIBL_ERR_MEMERR;
+	}
+out:
+	str_free( &fullttl );
 }
 
 static void
@@ -128,86 +133,89 @@ append_abbrtitle( fields *in, char *isitag, int level, fields *out, int *status 
 static void
 append_keywords( fields *in, fields *out, int *status )
 {
-	newstr keywords;
-	int i, fstatus;
+	vplist_index i;
+	str keywords;
+	int fstatus;
 	vplist kw;
 
-	newstr_init( &keywords );
-
+	str_init( &keywords );
 	vplist_init( &kw );
-	fields_findv_each( in, LEVEL_ANY, FIELDS_CHRP, &kw, "KEYWORD" );
+
+	fields_findv_each( in, LEVEL_ANY, FIELDS_STRP, &kw, "KEYWORD" );
 	if ( kw.n ) {
 		for ( i=0; i<kw.n; ++i ) {
-			if ( i>0 ) newstr_strcat( &keywords, "; " );
-			newstr_strcat( &keywords, (char *) vplist_get( &kw, i ) );
+			if ( i>0 ) str_strcatc( &keywords, "; " );
+			str_strcat( &keywords, (str *) vplist_get( &kw, i ) );
 		}
-		fstatus = fields_add( out, "DE", newstr_cstr( &keywords ), LEVEL_MAIN );
-		if ( fstatus!=FIELDS_OK ) *status = BIBL_ERR_MEMERR;
+		if ( str_memerr( &keywords ) ) { *status = BIBL_ERR_MEMERR; goto out; }
+		fstatus = fields_add( out, "DE", str_cstr( &keywords ), LEVEL_MAIN );
+		if ( fstatus!=FIELDS_OK ) { *status = BIBL_ERR_MEMERR; goto out; }
 	}
+out:
 	vplist_free( &kw );
-
-	newstr_free( &keywords );
+	str_free( &keywords );
 }
 
 static void
-process_person( newstr *person, char *name )
+process_person( str *person, char *name )
 {
-	newstr family, given, suffix;
+	str family, given, suffix;
 	char *p = name;
 
-	newstr_empty( person );
+	str_empty( person );
 
-	newstrs_init( &family, &given, &suffix, NULL );
+	strs_init( &family, &given, &suffix, NULL );
 
 	while ( *p && *p!='|' )
-		newstr_addchar( &family, *p++ );
+		str_addchar( &family, *p++ );
 
 	while ( *p=='|' && *(p+1)!='|' ) {
 		p++;
-		if ( *p!='|' ) newstr_addchar( &given, *p++ );
+		if ( *p!='|' ) str_addchar( &given, *p++ );
 		while ( *p && *p!='|' ) p++;
 	}
 
 	if ( *p=='|' && *(p+1)=='|' ) {
 		p += 2;
-		while ( *p && *p!='|' ) newstr_addchar( &suffix, *p++ );
+		while ( *p && *p!='|' ) str_addchar( &suffix, *p++ );
 	}
 
-	if ( family.len ) newstr_newstrcat( person, &family );
-	if ( suffix.len ) {
-		if ( family.len ) newstr_strcat( person, " " );
-		newstr_newstrcat( person, &suffix );
+	if ( str_has_value( &family ) ) str_strcat( person, &family );
+	if ( str_has_value( &suffix ) ) {
+		if ( str_has_value( &family ) ) str_strcatc( person, " " );
+		str_strcat( person, &suffix );
 	}
-	if ( given.len ) {
-		if ( person->len ) newstr_strcat( person, ", " );
-		newstr_newstrcat( person, &given );
+	if ( str_has_value( &given ) ) {
+		if ( str_has_value( person ) ) str_strcatc( person, ", " );
+		str_strcat( person, &given );
 	}
 
-	newstrs_free( &family, &given, &suffix, NULL );
+	strs_free( &family, &given, &suffix, NULL );
 }
 
 static void
 append_people( fields *f, char *tag, char *isitag, int level, fields *out, int *status )
 {
-	int i, fstatus;
+	vplist_index i;
 	vplist people;
-	newstr person;
+	str person;
+	int fstatus;
 
-	newstr_init( &person );
-
+	str_init( &person );
 	vplist_init( &people );
-	fields_findv_each( f, level, FIELDS_CHRP, &people, tag );
-	if ( people.n ) {
-		for ( i=0; i<people.n; ++i ) {
-			process_person( &person, (char *)vplist_get( &people, i ) );
-			if ( i==0 ) fstatus = fields_add_can_dup( out, isitag, newstr_cstr( &person ), LEVEL_MAIN );
-			else        fstatus = fields_add_can_dup( out, "  ",   newstr_cstr( &person ), LEVEL_MAIN );
-			if ( fstatus!=FIELDS_OK ) *status = BIBL_ERR_MEMERR;
-		}
-	}
-	vplist_free( &people );
 
-	newstr_free( &person );
+	fields_findv_each( f, level, FIELDS_CHRP, &people, tag );
+	for ( i=0; i<people.n; ++i ) {
+		process_person( &person, (char *)vplist_get( &people, i ) );
+		if ( str_memerr( &person ) ) { *status = BIBL_ERR_MEMERR; goto out; }
+		if ( i==0 ) fstatus = fields_add_can_dup( out, isitag, str_cstr( &person ), LEVEL_MAIN );
+		else        fstatus = fields_add_can_dup( out, "  ",   str_cstr( &person ), LEVEL_MAIN );
+		if ( fstatus!=FIELDS_OK ) { *status = BIBL_ERR_MEMERR; goto out; }
+	}
+
+out:
+	vplist_free( &people );
+	str_free( &person );
 }
 
 static void
@@ -226,7 +234,8 @@ append_easy( fields *in, char *tag, char *isitag, int level, fields *out, int *s
 static void
 append_easyall( fields *in, char *tag, char *isitag, int level, fields *out, int *status )
 {
-	int i, fstatus;
+	vplist_index i;
+	int fstatus;
 	vplist a;
 
 	vplist_init( &a );

@@ -1,7 +1,7 @@
 /*
  * utf8_test.c
  *
- * Copyright (c) 2012-2016
+ * Copyright (c) 2012-2017
  *
  * Source code released under the GPL version 2
  *

@@ -1,7 +1,7 @@
 /*
  * bibtexout.c
  *
- * Copyright (c) Chris Putnam 2003-2016
+ * Copyright (c) Chris Putnam 2003-2017
  *
  * Program and source code released under the GPL version 2
  *
@@ -10,7 +10,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
-#include "newstr.h"
+#include "str.h"
 #include "strsearch.h"
 #include "utf8.h"
 #include "xml.h"
@@ -239,7 +239,7 @@ static void
 append_citekey( fields *in, fields *out, int format_opts, int *status )
 {
 	int n, fstatus;
-	newstr s;
+	str s;
 	char *p;
 
 	n = fields_find( in, "REFNUM", LEVEL_ANY );
@@ -249,25 +249,26 @@ append_citekey( fields *in, fields *out, int format_opts, int *status )
 	}
 
 	else {
-		newstr_init( &s );
+		str_init( &s );
 		p = fields_value( in, n, FIELDS_CHRP );
 		while ( p && *p && *p!='|' ) {
 			if ( format_opts & BIBL_FORMAT_BIBOUT_STRICTKEY ) {
 				if ( isdigit((unsigned char)*p) || (*p>='A' && *p<='Z') ||
 				     (*p>='a' && *p<='z' ) ) {
-					newstr_addchar( &s, *p );
+					str_addchar( &s, *p );
 				}
 			}
 			else {
 				if ( *p!=' ' && *p!='\t' ) {
-					newstr_addchar( &s, *p );
+					str_addchar( &s, *p );
 				}
 			}
 			p++;
 		}
-		fstatus = fields_add( out, "REFNUM", newstr_cstr( &s ), LEVEL_MAIN );
+		if ( str_memerr( &s ) )  { *status = BIBL_ERR_MEMERR; str_free( &s ); return; }
+		fstatus = fields_add( out, "REFNUM", str_cstr( &s ), LEVEL_MAIN );
 		if ( fstatus!=FIELDS_OK ) *status = BIBL_ERR_MEMERR;
-		newstr_free( &s );
+		str_free( &s );
 	}
 }
 
@@ -304,11 +305,12 @@ append_simpleall( fields *in, char *intag, char *outtag, fields *out, int *statu
 static void
 append_keywords( fields *in, fields *out, int *status )
 {
-	newstr keywords, *word;
-	int i, fstatus;
+	str keywords, *word;
+	vplist_index i;
+	int fstatus;
 	vplist a;
 
-	newstr_init( &keywords );
+	str_init( &keywords );
 	vplist_init( &a );
 
 	fields_findv_each( in, LEVEL_ANY, FIELDS_STRP, &a, "KEYWORD" );
@@ -317,11 +319,13 @@ append_keywords( fields *in, fields *out, int *status )
 
 		for ( i=0; i<a.n; ++i ) {
 			word = vplist_get( &a, i );
-			if ( i>0 ) newstr_strcat( &keywords, "; " );
-			newstr_newstrcat( &keywords, word );
+			if ( i>0 ) str_strcatc( &keywords, "; " );
+			str_strcat( &keywords, word );
 		}
 
-		fstatus = fields_add( out, "keywords", keywords.data, LEVEL_MAIN );
+		if ( str_memerr( &keywords ) ) { *status = BIBL_ERR_MEMERR; goto out; }
+
+		fstatus = fields_add( out, "keywords", str_cstr( &keywords ), LEVEL_MAIN );
 		if ( fstatus!=FIELDS_OK ) {
 			*status = BIBL_ERR_MEMERR;
 			goto out;
@@ -331,48 +335,59 @@ append_keywords( fields *in, fields *out, int *status )
 	}
 
 out:
-	newstr_free( &keywords );
+	str_free( &keywords );
 	vplist_free( &a );
 }
 
 static void
 append_fileattach( fields *in, fields *out, int *status )
 {
+	char *tag, *value;
 	int i, fstatus;
-	newstr data;
-	char *tag;
+	str data;
 
-	newstr_init( &data );
+	str_init( &data );
+
 	for ( i=0; i<in->n; ++i ) {
+
 		tag = fields_tag( in, i, FIELDS_CHRP );
 		if ( strcasecmp( tag, "FILEATTACH" ) ) continue;
-		newstr_strcpy( &data, ":" );
-		newstr_newstrcat( &data, &(in->data[i]) );
-		if ( strsearch( in->data[i].data, ".pdf" ) )
-			newstr_strcat( &data, ":PDF" );
-		else if ( strsearch( in->data[i].data, ".html" ) )
-			newstr_strcat( &data, ":HTML" );
-		else newstr_strcat( &data, ":TYPE" );
+
+		value = fields_value( in, i, FIELDS_CHRP );
+		str_strcpyc( &data, ":" );
+		str_strcatc( &data, value );
+		if ( strsearch( value, ".pdf" ) )
+			str_strcatc( &data, ":PDF" );
+		else if ( strsearch( value, ".html" ) )
+			str_strcatc( &data, ":HTML" );
+		else str_strcatc( &data, ":TYPE" );
+
+		if ( str_memerr( &data ) ) {
+			*status = BIBL_ERR_MEMERR;
+			goto out;
+		}
+
 		fields_setused( in, i );
-		fstatus = fields_add( out, "file", data.data, LEVEL_MAIN );
+		fstatus = fields_add( out, "file", str_cstr( &data ), LEVEL_MAIN );
 		if ( fstatus!=FIELDS_OK ) {
 			*status = BIBL_ERR_MEMERR;
 			goto out;
 		}
-		newstr_empty( &data );
+
+		str_empty( &data );
 	}
 out:
-	newstr_free( &data );
+	str_free( &data );
 }
 
 static void
 append_people( fields *in, char *tag, char *ctag, char *atag,
 		char *bibtag, int level, fields *out, int format_opts )
 {
-	newstr allpeople, oneperson;
+	str allpeople, oneperson;
 	int i, npeople, person, corp, asis;
 
-	newstrs_init( &allpeople, &oneperson, NULL );
+	strs_init( &allpeople, &oneperson, NULL );
 
 	/* primary citation authors */
 	npeople = 0;
@@ -384,20 +399,20 @@ append_people( fields *in, char *tag, char *ctag, char *atag,
 		if ( person || corp || asis ) {
 			if ( npeople>0 ) {
 				if ( format_opts & BIBL_FORMAT_BIBOUT_WHITESPACE )
-					newstr_strcat(&allpeople,"\n\t\tand ");
-				else newstr_strcat( &allpeople, "\nand " );
+					str_strcatc( &allpeople, "\n\t\tand " );
+				else str_strcatc( &allpeople, "\nand " );
 			}
 			if ( corp ) {
-				newstr_addchar( &allpeople, '{' );
-				newstr_strcat( &allpeople, fields_value( in, i, FIELDS_CHRP ) );
-				newstr_addchar( &allpeople, '}' );
+				str_addchar( &allpeople, '{' );
+				str_strcat( &allpeople, fields_value( in, i, FIELDS_STRP ) );
+				str_addchar( &allpeople, '}' );
 			} else if ( asis ) {
-				newstr_addchar( &allpeople, '{' );
-				newstr_strcat( &allpeople, fields_value( in, i, FIELDS_CHRP ) );
-				newstr_addchar( &allpeople, '}' );
+				str_addchar( &allpeople, '{' );
+				str_strcat( &allpeople, fields_value( in, i, FIELDS_STRP ) );
+				str_addchar( &allpeople, '}' );
 			} else {
 				name_build_withcomma( &oneperson, fields_value( in, i, FIELDS_CHRP ) );
-				newstr_newstrcat( &allpeople, &oneperson );
+				str_strcat( &allpeople, &oneperson );
 			}
 			npeople++;
 		}
@@ -406,16 +421,16 @@ append_people( fields *in, char *tag, char *ctag, char *atag,
 		fields_add( out, bibtag, allpeople.data, LEVEL_MAIN );
 	}
 
-	newstrs_free( &allpeople, &oneperson, NULL );
+	strs_free( &allpeople, &oneperson, NULL );
 }
 
 static int
 append_title_chosen( fields *in, char *bibtag, fields *out, int nmainttl, int nsubttl )
 {
-	newstr fulltitle, *mainttl = NULL, *subttl = NULL;
+	str fulltitle, *mainttl = NULL, *subttl = NULL;
 	int status, ret = BIBL_OK;
 
-	newstr_init( &fulltitle );
+	str_init( &fulltitle );
 
 	if ( nmainttl!=-1 ) {
 		mainttl = fields_value( in, nmainttl, FIELDS_STRP );
@@ -429,13 +444,18 @@ append_title_chosen( fields *in, char *bibtag, fields *out, int nmainttl, int ns
 
 	title_combine( &fulltitle, mainttl, subttl );
 
-	if ( fulltitle.len ) {
-		status = fields_add( out, bibtag, newstr_cstr( &fulltitle ), LEVEL_MAIN );
+	if ( str_memerr( &fulltitle ) ) {
+		ret = BIBL_ERR_MEMERR;
+		goto out;
+	}
+
+	if ( str_has_value( &fulltitle ) ) {
+		status = fields_add( out, bibtag, str_cstr( &fulltitle ), LEVEL_MAIN );
 		if ( status!=FIELDS_OK ) ret = BIBL_ERR_MEMERR;
 	}
 
-	newstr_free( &fulltitle );
-
+out:
+	str_free( &fulltitle );
 	return ret;
 }
 
@@ -575,7 +595,7 @@ static void
 append_arxiv( fields *in, fields *out, int *status )
 {
 	int n, fstatus1, fstatus2;
-	newstr url;
+	str url;
 
 	n = fields_find( in, "ARXIV", LEVEL_ANY );
 	if ( n==-1 ) return;
@@ -585,7 +605,7 @@ append_arxiv( fields *in, fields *out, int *status )
 	/* ...write:
 	 *     archivePrefix = "arXiv",
 	 *     eprint = "#####",
-	 * ...for people in high energy physics
+	 * ...for arXiv references
 	 */
 	fstatus1 = fields_add( out, "archivePrefix", "arXiv", LEVEL_MAIN );
 	fstatus2 = fields_add( out, "eprint", fields_value( in, n, FIELDS_CHRP ), LEVEL_MAIN );
@@ -598,30 +618,30 @@ append_arxiv( fields *in, fields *out, int *status )
 	 *     url = "http://arxiv.org/abs/####",
 	 * ...to maximize compatibility
 	 */
-	newstr_init( &url );
+	str_init( &url );
 	arxiv_to_url( in, n, "URL", &url );
-	if ( url.len ) {
-		fstatus1 = fields_add( out, "url", newstr_cstr( &url ), LEVEL_MAIN );
+	if ( str_has_value( &url ) ) {
+		fstatus1 = fields_add( out, "url", str_cstr( &url ), LEVEL_MAIN );
 		if ( fstatus1!=FIELDS_OK ) *status = BIBL_ERR_MEMERR;
 	}
-	newstr_free( &url );
+	str_free( &url );
 }
 
 static void
 append_urls( fields *in, fields *out, int *status )
 {
 	int lstatus;
-	list types;
+	slist types;
 
-	lstatus = list_init_valuesc( &types, "URL", "PMID", "PMC", "JSTOR", NULL );
-	if ( lstatus!=LIST_OK ) {
+	lstatus = slist_init_valuesc( &types, "URL", "PMID", "PMC", "JSTOR", NULL );
+	if ( lstatus!=SLIST_OK ) {
 		*status = BIBL_ERR_MEMERR;
 		return;
 	}
 
 	*status = urls_merge_and_add( in, LEVEL_ANY, out, "url", LEVEL_MAIN, &types );
 
-	list_free( &types );
+	slist_free( &types );
 }
 
 static void
@@ -642,44 +662,68 @@ append_articlenumber( fields *in, fields *out )
 	int n, fstatus;
 
 	n = fields_find( in, "ARTICLENUMBER", LEVEL_ANY );
-	if ( n==-1 ) return BIBL_OK;
-
-	fields_setused( in, n );
-	fstatus = fields_add( out, "pages", fields_value( in, n, FIELDS_CHRP ), LEVEL_MAIN );
-	if ( fstatus!=FIELDS_OK ) return BIBL_ERR_MEMERR;
+	if ( n!=-1 ) {
+		fields_setused( in, n );
+		fstatus = fields_add( out, "pages", fields_value( in, n, FIELDS_CHRP ), LEVEL_MAIN );
+		if ( fstatus!=FIELDS_OK ) return BIBL_ERR_MEMERR;
+	}
 	return BIBL_OK;
+}
+
+static int
+pages_build_pagestr( str *pages, fields *in, int sn, int en, int format_opts )
+{
+	/* ...append if starting page number is defined */
+	if ( sn!=-1 ) {
+		str_strcat( pages, fields_value( in, sn, FIELDS_STRP ) );
+		fields_setused( in, sn );
+	}
+
+	/* ...append dashes if both starting and ending page numbers are defined */
+	if ( sn!=-1 && en!=-1 ) {
+		if ( format_opts & BIBL_FORMAT_BIBOUT_SINGLEDASH )
+			str_strcatc( pages, "-" );
+		else
+			str_strcatc( pages, "--" );
+	}
+
+	/* ...append ending page number is defined */
+	if ( en!=-1 ) {
+		str_strcat( pages, fields_value( in, en, FIELDS_STRP ) );
+		fields_setused( in, en );
+	}
+
+	if ( str_memerr( pages ) ) return BIBL_ERR_MEMERR;
+	else return BIBL_OK;
+}
+
+static int
+pages_are_defined( fields *in, int *sn, int *en )
+{
+	*sn = fields_find( in, "PAGES:START", LEVEL_ANY );
+	*en = fields_find( in, "PAGES:STOP",  LEVEL_ANY );
+	if ( *sn==-1 && *en==-1 ) return 0;
+	else return 1;
 }
 
 static void
 append_pages( fields *in, fields *out, int format_opts, int *status )
 {
 	int sn, en, fstatus;
-	newstr pages;
+	str pages;
 
-	sn = fields_find( in, "PAGES:START", LEVEL_ANY );
-	en = fields_find( in, "PAGES:STOP",  LEVEL_ANY );
-	if ( sn==-1 && en==-1 ) {
+	if ( !pages_are_defined( in, &sn, &en ) ) {
 		*status = append_articlenumber( in, out );
 		return;
 	}
-	newstr_init( &pages );
-	if ( sn!=-1 ) {
-		newstr_newstrcat( &pages, fields_value( in, sn, FIELDS_STRP ) );
-		fields_setused( in, sn );
+
+	str_init( &pages );
+	*status = pages_build_pagestr( &pages, in, sn, en, format_opts );
+	if ( *status==BIBL_OK ) {
+		fstatus = fields_add( out, "pages", str_cstr( &pages ), LEVEL_MAIN );
+		if ( fstatus!=FIELDS_OK ) *status = BIBL_ERR_MEMERR;
 	}
-	if ( sn!=-1 && en!=-1 ) {
-		if ( format_opts & BIBL_FORMAT_BIBOUT_SINGLEDASH )
-			newstr_strcat( &pages, "-" );
-		else
-			newstr_strcat( &pages, "--" );
-	}
-	if ( en!=-1 ) {
-		newstr_newstrcat( &pages, fields_value( in, en, FIELDS_STRP ) );
-		fields_setused( in, en );
-	}
-	fstatus = fields_add( out, "pages", newstr_cstr( &pages ), LEVEL_MAIN );
-	if ( fstatus!=FIELDS_OK ) *status = BIBL_ERR_MEMERR;
-	newstr_free( &pages );
+	str_free( &pages );
 }
 
 /*
@@ -759,6 +803,7 @@ append_data( fields *in, fields *out, param *p, unsigned long refnum )
 	append_urls        ( in, out, &status );
 	append_fileattach  ( in, out, &status );
 	append_arxiv       ( in, out, &status );
+	append_simple      ( in, "EPRINTCLASS",        "primaryClass", out, &status );
 	append_isi         ( in, out, &status );
 	append_simple      ( in, "LANGUAGE",           "language",  out, &status );
 

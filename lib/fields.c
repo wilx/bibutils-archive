@@ -1,7 +1,7 @@
 /*
  * fields.c
  *
- * Copyright (c) Chris Putnam 2003-2016
+ * Copyright (c) Chris Putnam 2003-2017
  *
  * Source code released under the GPL version 2
  *
@@ -36,8 +36,8 @@ fields_free( fields *f )
 	int i;
 
 	for ( i=0; i<f->max; ++i ) {
-		newstr_free( &(f->tag[i]) );
-		newstr_free( &(f->data[i]) );
+		str_free( &(f->tag[i]) );
+		str_free( &(f->data[i]) );
 	}
 	if ( f->tag )   free( f->tag );
 	if ( f->data )  free( f->data );
@@ -52,8 +52,8 @@ fields_alloc( fields *f )
 {
 	int i, alloc = 20;
 
-	f->tag   = (newstr *) malloc( sizeof(newstr) * alloc );
-	f->data  = (newstr *) malloc( sizeof(newstr) * alloc );
+	f->tag   = (str *) malloc( sizeof(str) * alloc );
+	f->data  = (str *) malloc( sizeof(str) * alloc );
 	f->used  = (int *)    calloc( alloc, sizeof(int) );
 	f->level = (int *)    calloc( alloc, sizeof(int) );
 	if ( !f->tag || !f->data || !f->used || !f->level ){
@@ -68,8 +68,8 @@ fields_alloc( fields *f )
 	f->max = alloc;
 	f->n = 0;
 	for ( i=0; i<alloc; ++i ) {
-		newstr_init( &(f->tag[i]) );
-		newstr_init( &(f->data[i]) );
+		str_init( &(f->tag[i]) );
+		str_init( &(f->data[i]) );
 	}
 	return FIELDS_OK;
 }
@@ -77,12 +77,12 @@ fields_alloc( fields *f )
 static int
 fields_realloc( fields *f )
 {
-	newstr *newtags, *newdata;
+	str *newtags, *newdata;
 	int *newused, *newlevel;
 	int i, alloc = f->max * 2;
 
-	newtags = (newstr*) realloc( f->tag, sizeof(newstr) * alloc );
-	newdata = (newstr*) realloc( f->data, sizeof(newstr) * alloc );
+	newtags = (str*) realloc( f->tag, sizeof(str) * alloc );
+	newdata = (str*) realloc( f->data, sizeof(str) * alloc );
 	newused = (int*)    realloc( f->used, sizeof(int) * alloc );
 	newlevel= (int*)    realloc( f->level, sizeof(int) * alloc );
 
@@ -97,8 +97,8 @@ fields_realloc( fields *f )
 	f->max = alloc;
 
 	for ( i=f->n; i<alloc; ++i ) {
-		newstr_init( &(f->tag[i]) );
-		newstr_init( &(f->data[i]) );
+		str_init( &(f->tag[i]) );
+		str_init( &(f->data[i]) );
 	}
 
 	return FIELDS_OK;
@@ -132,10 +132,10 @@ _fields_add( fields *f, char *tag, char *data, int level, int mode )
 	n = f->n;
 	f->used[ n ]  = 0;
 	f->level[ n ] = level;
-	newstr_strcpy( &(f->tag[n]), tag );
-	newstr_strcpy( &(f->data[n]), data );
+	str_strcpyc( &(f->tag[n]), tag );
+	str_strcpyc( &(f->data[n]), data );
 
-	if ( newstr_memerr( &(f->tag[n]) ) || newstr_memerr( &(f->data[n] ) ) )
+	if ( str_memerr( &(f->tag[n]) ) || str_memerr( &(f->data[n] ) ) )
 		return FIELDS_ERR;
 
 	f->n++;
@@ -147,14 +147,14 @@ int
 _fields_add_tagsuffix( fields *f, char *tag, char *suffix,
 		char *data, int level, int mode )
 {
-	newstr newtag;
+	str newtag;
 	int ret;
 
-	newstr_init( &newtag );
-	newstr_mergestrs( &newtag, tag, suffix, NULL );
-	if ( newstr_memerr( &newtag ) ) ret = FIELDS_ERR;
+	str_init( &newtag );
+	str_mergestrs( &newtag, tag, suffix, NULL );
+	if ( str_memerr( &newtag ) ) ret = FIELDS_ERR;
 	else ret = _fields_add( f, newtag.data, data, level, mode );
-	newstr_free( &newtag );
+	str_free( &newtag );
 
 	return ret;
 }
@@ -272,8 +272,8 @@ fields_replace_or_add( fields *f, char *tag, char *data, int level )
 	int n = fields_find( f, tag, level );
 	if ( n==-1 ) return fields_add( f, tag, data, level );
 	else {
-		newstr_strcpy( &(f->data[n]), data );
-		if ( newstr_memerr( &(f->data[n]) ) ) return FIELDS_ERR;
+		str_strcpyc( &(f->data[n]), data );
+		if ( str_memerr( &(f->data[n]) ) ) return FIELDS_ERR;
 		return FIELDS_OK;
 	}
 }
@@ -290,7 +290,7 @@ fields_used( fields *f, int n )
 int
 fields_notag( fields *f, int n )
 {
-	newstr *t;
+	str *t;
 	if ( n >= 0 && n < f->n ) {
 		t = &( f->tag[n] );
 		if ( t->len > 0 ) return 0;
@@ -301,7 +301,7 @@ fields_notag( fields *f, int n )
 int
 fields_nodata( fields *f, int n )
 {
-	newstr *d;
+	str *d;
 	if ( n >= 0 && n < f->n ) {
 		d = &( f->data[n] );
 		if ( d->len > 0 ) return 0;
@@ -324,7 +324,7 @@ fields_num( fields *f )
  * If the length of the tagged value is zero and the mode is
  * FIELDS_STRP_NOLEN or FIELDS_CHRP_NOLEN, return a pointer to
  * a static null string as the data field could be new due to
- * the way newstr handles initialized strings with no data.
+ * the way str handles initialized strings with no data.
  *
  */
 

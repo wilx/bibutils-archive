@@ -1,8 +1,8 @@
 /*
  * adsout.c
  *
- * Copyright (c) Richard Mathar 2007-2016
- * Copyright (c) Chris Putnam 2007-2016
+ * Copyright (c) Richard Mathar 2007-2017
+ * Copyright (c) Chris Putnam 2007-2017
  *
  * Program and source code released under the GPL version 2
  *
@@ -13,7 +13,7 @@
 #include <string.h>
 #include <ctype.h>
 #include "utf8.h"
-#include "newstr.h"
+#include "str.h"
 #include "strsearch.h"
 #include "fields.h"
 #include "name.h"
@@ -23,7 +23,6 @@
 
 static int  adsout_write( fields *in, FILE *fp, param *p, unsigned long refnum );
 static void adsout_writeheader( FILE *outptr, param *p );
-
 
 void
 adsout_initparams( param *p, const char *progname )
@@ -156,58 +155,65 @@ get_type( fields *in )
 static int
 append_title( fields *in, char *ttl, char *sub, char *adstag, int level, fields *out, int *status )
 {
-	newstr fulltitle, *title, *subtitle, *vol, *iss, *sn, *en, *ar;
+	str fulltitle, *title, *subtitle, *vol, *iss, *sn, *en, *ar;
 	int fstatus, output = 0;
 
-	newstr_init( &fulltitle );
+	str_init( &fulltitle );
 
 	title     = fields_findv( in, level, FIELDS_STRP, ttl );
 	subtitle  = fields_findv( in, level, FIELDS_STRP, sub );
 
-	if ( title && title->len ) {
+	if ( str_has_value( title ) ) {
 
 		output = 1;
 
 		title_combine( &fulltitle, title, subtitle );
 
 		vol = fields_findv( in, LEVEL_ANY, FIELDS_STRP, "VOLUME" );
-		if ( vol && vol->len ) {
-			newstr_strcat( &fulltitle, ", vol. " );
-			newstr_newstrcat( &fulltitle, vol );
+		if ( str_has_value( vol ) ) {
+			str_strcatc( &fulltitle, ", vol. " );
+			str_strcat( &fulltitle, vol );
 		}
 
 		iss = fields_findv_firstof( in, LEVEL_ANY, FIELDS_STRP, "ISSUE",
 			"NUMBER", NULL );
-		if ( iss && iss->len ) {
-			newstr_strcat( &fulltitle, ", no. " );
-			newstr_newstrcat( &fulltitle, iss );
+		if ( str_has_value( iss ) ) {
+			str_strcatc( &fulltitle, ", no. " );
+			str_strcat( &fulltitle, iss );
 		}
 
 		sn = fields_findv( in, LEVEL_ANY, FIELDS_STRP, "PAGES:START" );
 		en = fields_findv( in, LEVEL_ANY, FIELDS_STRP, "PAGES:STOP" );
 		ar = fields_findv( in, LEVEL_ANY, FIELDS_STRP, "ARTICLENUMBER" );
-		if ( sn && sn->len ) {
-			if ( en && en->len ) {
-				newstr_strcat( &fulltitle, ", pp. " );
+
+		if ( str_has_value( sn ) ) {
+			if ( str_has_value( en ) ) {
+				str_strcatc( &fulltitle, ", pp. " );
 			} else {
-				newstr_strcat( &fulltitle, ", p. " );
+				str_strcatc( &fulltitle, ", p. " );
 			}
-			newstr_newstrcat( &fulltitle, sn );
-		} else if ( ar && ar->len ) {
-			newstr_strcat( &fulltitle, ", p. " );
-			newstr_newstrcat( &fulltitle, ar );
+			str_strcat( &fulltitle, sn );
+		} else if ( str_has_value( ar ) ) {
+			str_strcatc( &fulltitle, ", p. " );
+			str_strcat( &fulltitle, ar );
 		}
-		if ( en && en->len ) {
-			newstr_addchar( &fulltitle, '-' );
-			newstr_newstrcat( &fulltitle, en );
+		if ( str_has_value( en ) ) {
+			str_addchar( &fulltitle, '-' );
+			str_strcat( &fulltitle, en );
 		}
 
-		fstatus = fields_add( out, adstag, newstr_cstr( &fulltitle ), LEVEL_MAIN );
+		if ( str_memerr( &fulltitle ) ) {
+			*status = BIBL_ERR_MEMERR;
+			goto out;
+		}
+
+		fstatus = fields_add( out, adstag, str_cstr( &fulltitle ), LEVEL_MAIN );
 		if ( fstatus!=FIELDS_OK ) *status = BIBL_ERR_MEMERR;
 
 	}
 
-	newstr_free( &fulltitle );
+out:
+	str_free( &fulltitle );
 
 	return output;
 }
@@ -226,58 +232,59 @@ append_titles( fields *in, int type, fields *out, int *status )
 static void
 append_people( fields *in, char *tag1, char *tag2, char *tag3, char *adstag, int level, fields *out, int *status )
 {
-	newstr oneperson, allpeople;
+	str oneperson, allpeople;
+	vplist_index i;
+	int fstatus;
 	vplist a;
-	int i, fstatus;
 
-	newstr_init( &oneperson );
-	newstr_init( &allpeople );
+	str_init( &oneperson );
+	str_init( &allpeople );
 	vplist_init( &a );
 
 	fields_findv_eachof( in, level, FIELDS_CHRP, &a, tag1, tag2, tag3, NULL );
-	for ( i=0; i<a.n; ++i ) {
-		if ( i!=0 ) newstr_strcat( &allpeople, "; " );
-		name_build_withcomma( &oneperson, (char *) vplist_get( &a, i) );
-		newstr_newstrcat( &allpeople, &oneperson );
-	}
 	if ( a.n ) {
-		fstatus = fields_add( out, adstag, newstr_cstr( &allpeople ), LEVEL_MAIN );
+		for ( i=0; i<a.n; ++i ) {
+			if ( i!=0 ) str_strcatc( &allpeople, "; " );
+			name_build_withcomma( &oneperson, (char *) vplist_get( &a, i) );
+			str_strcat( &allpeople, &oneperson );
+		}
+		fstatus = fields_add( out, adstag, str_cstr( &allpeople ), LEVEL_MAIN );
 		if ( fstatus!=FIELDS_OK ) *status = BIBL_ERR_MEMERR;
 	}
 
 	vplist_free( &a );
-	newstr_free( &oneperson );
-	newstr_free( &allpeople );
+	str_free( &oneperson );
+	str_free( &allpeople );
 }
 
 static void
 append_pages( fields *in, fields *out, int *status )
 {
-	newstr *sn, *en, *ar;
+	str *sn, *en, *ar;
 	int fstatus;
 
 	sn = fields_findv( in, LEVEL_ANY, FIELDS_STRP, "PAGES:START" );
 	en = fields_findv( in, LEVEL_ANY, FIELDS_STRP, "PAGES:STOP" );
 	ar = fields_findv( in, LEVEL_ANY, FIELDS_STRP, "ARTICLENUMBER" );
 
-	if ( sn && sn->len!=0 ) {
-		fstatus = fields_add( out, "%P", newstr_cstr( sn ), LEVEL_MAIN );
+	if ( str_has_value( sn ) ) {
+		fstatus = fields_add( out, "%P", str_cstr( sn ), LEVEL_MAIN );
 		if ( fstatus!=FIELDS_OK ) {
 			*status = BIBL_ERR_MEMERR;
 			return;
 		}
 	}
 
-	else if ( ar && ar->len!=0 ) {
-		fstatus = fields_add( out, "%P", newstr_cstr( ar ), LEVEL_MAIN );
+	else if ( str_has_value( ar ) ) {
+		fstatus = fields_add( out, "%P", str_cstr( ar ), LEVEL_MAIN );
 		if ( fstatus!=FIELDS_OK ) {
 			*status = BIBL_ERR_MEMERR;
 			return;
 		}
 	}
 
-	if ( en && en->len!=0 ) {
-		fstatus = fields_add( out, "%L", newstr_cstr( en ), LEVEL_MAIN );
+	if ( str_has_value( en ) ) {
+		fstatus = fields_add( out, "%L", str_cstr( en ), LEVEL_MAIN );
 		if ( fstatus!=FIELDS_OK ) {
 			*status = BIBL_ERR_MEMERR;
 			return;
@@ -303,10 +310,10 @@ mont2mont( const char *m )
 static int
 get_month( fields *in, int level )
 {
-	newstr *month;
+	str *month;
 
 	month = fields_findv_firstof( in, level, FIELDS_STRP, "DATE:MONTH", "PARTDATE:MONTH", NULL );
-	if ( month && month->len ) return mont2mont( month->data );
+	if ( str_has_value( month ) ) return mont2mont( month->data );
 	else return 0;
 }
 
@@ -315,12 +322,12 @@ append_date( fields *in, char *adstag, int level, fields *out, int *status )
 {
 	int month, fstatus;
 	char outstr[1000];
-	newstr *year;
+	str *year;
 
 	year = fields_findv_firstof( in, level, FIELDS_STRP, "DATE:YEAR", "PARTDATE:YEAR", NULL );
-	if ( year && year->len ) {
+	if ( str_has_value( year ) ) {
 		month = get_month( in, level );
-		sprintf( outstr, "%02d/%s", month, newstr_cstr( year ) );
+		sprintf( outstr, "%02d/%s", month, str_cstr( year ) );
 		fstatus = fields_add( out, adstag, outstr, LEVEL_MAIN );
 		if ( fstatus!=FIELDS_OK ) *status = BIBL_ERR_MEMERR;
 	}
@@ -427,7 +434,8 @@ append_Rtag( fields *in, char *adstag, int type, fields *out, int *status )
 static void
 append_easyall( fields *in, char *tag, char *adstag, int level, fields *out, int *status )
 {
-	int i, fstatus;
+	vplist_index i;
+	int fstatus;
 	vplist a;
 
 	vplist_init( &a );
@@ -461,26 +469,26 @@ append_easy( fields *in, char *tag, char *adstag, int level, fields *out, int *s
 static void
 append_keys( fields *in, char *tag, char *adstag, int level, fields *out, int *status )
 {
-	newstr allkeys;
-	int i, fstatus;
+	vplist_index i;
+	str allkeys;
+	int fstatus;
 	vplist a;
 
-	newstr_init( &allkeys );
+	str_init( &allkeys );
 	vplist_init( &a );
 
 	fields_findv_each( in, level, FIELDS_CHRP, &a, tag );
 
-	for ( i=0; i<a.n; ++i ) {
-		if ( i>0 ) newstr_strcat( &allkeys, ", " );
-		newstr_strcat( &allkeys, (char *) vplist_get( &a, i ) );
-	}
-
 	if ( a.n ) {
-		fstatus = fields_add( out, adstag, newstr_cstr( &allkeys ), LEVEL_MAIN );
+		for ( i=0; i<a.n; ++i ) {
+			if ( i>0 ) str_strcatc( &allkeys, ", " );
+			str_strcatc( &allkeys, (char *) vplist_get( &a, i ) );
+		}
+		fstatus = fields_add( out, adstag, str_cstr( &allkeys ), LEVEL_MAIN );
 		if ( fstatus!=FIELDS_OK ) *status = BIBL_ERR_MEMERR;
 	}
 
-	newstr_free( &allkeys );
+	str_free( &allkeys );
 	vplist_free( &a );
 }
 
@@ -488,17 +496,17 @@ static void
 append_urls( fields *in, fields *out, int *status )
 {
 	int lstatus;
-	list types;
+	slist types;
 
-	lstatus = list_init_valuesc( &types, "URL", "PMID", "PMC", "ARXIV", "JSTOR", "MRNUMBER", "FILEATTACH", "FIGATTACH", NULL );
-	if ( lstatus!=LIST_OK ) {
+	lstatus = slist_init_valuesc( &types, "URL", "PMID", "PMC", "ARXIV", "JSTOR", "MRNUMBER", "FILEATTACH", "FIGATTACH", NULL );
+	if ( lstatus!=SLIST_OK ) {
 		*status = BIBL_ERR_MEMERR;
 		return;
 	}
 
 	*status = urls_merge_and_add( in, LEVEL_ANY, out, "%U", LEVEL_MAIN, &types );
 
-	list_free( &types );
+	slist_free( &types );
 }
 
 static void

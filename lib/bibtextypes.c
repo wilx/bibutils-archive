@@ -1,7 +1,7 @@
 /*
  * bibtypes.c
  *
- * Copyright (c) Chris Putnam 2003-2016
+ * Copyright (c) Chris Putnam 2003-2017
  *
  * Program and source code released under the GPL version 2
  *
@@ -42,7 +42,8 @@ static lookups article[] = {
 	{ "pdf",          "FILEATTACH",     SIMPLE,       LEVEL_MAIN },
 	{ "eprint",       "",               EPRINT,       LEVEL_MAIN },
 	{ "archivePrefix","ARCHIVEPREFIX",  SIMPLE,       LEVEL_MAIN },
-	{ "primaryClass", "KEYWORD",        KEYWORD,      LEVEL_MAIN },
+	{ "eprintclass",  "EPRINTCLASS",    SIMPLE,       LEVEL_MAIN },
+	{ "primaryClass", "EPRINTCLASS",    SIMPLE,       LEVEL_MAIN },
 	{ "sentelink",    "FILEATTACH",     BT_SENTE,     LEVEL_MAIN },
 	{ "file",         "FILEATTACH",     LINKEDFILE,   LEVEL_MAIN },
 	{ "howpublished", "",               HOWPUBLISHED, LEVEL_MAIN },

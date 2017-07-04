@@ -1,7 +1,7 @@
 /*
  * modsout.c
  *
- * Copyright (c) Chris Putnam 2003-2016
+ * Copyright (c) Chris Putnam 2003-2017
  *
  * Source code released under the GPL version 2
  *
@@ -11,9 +11,9 @@
 #include <stdarg.h>
 #include <string.h>
 #include "is_ws.h"
-#include "newstr.h"
+#include "str.h"
 #include "charsets.h"
-#include "newstr_conv.h"
+#include "str_conv.h"
 #include "fields.h"
 #include "iso639_2.h"
 #include "utf8.h"
@@ -209,16 +209,16 @@ output_title( fields *f, FILE *outptr, int level )
 static void
 output_name( FILE *outptr, char *p, int level )
 {
-	newstr family, part, suffix;
+	str family, part, suffix;
 	int n=0;
 
-	newstrs_init( &family, &part, &suffix, NULL );
+	strs_init( &family, &part, &suffix, NULL );
 
-	while ( *p && *p!='|' ) newstr_addchar( &family, *p++ );
+	while ( *p && *p!='|' ) str_addchar( &family, *p++ );
 	if ( *p=='|' ) p++;
 
 	while ( *p ) {
-		while ( *p && *p!='|' ) newstr_addchar( &part, *p++ );
+		while ( *p && *p!='|' ) str_addchar( &part, *p++ );
 		/* truncate periods from "A. B. Jones" names */
 		if ( part.len ) {
 			if ( part.len==2 && part.data[1]=='.' ) {
@@ -234,9 +234,9 @@ output_name( FILE *outptr, char *p, int level )
 			p++;
 			if ( *p=='|' ) {
 				p++;
-				while ( *p && *p!='|' ) newstr_addchar( &suffix, *p++ );
+				while ( *p && *p!='|' ) str_addchar( &suffix, *p++ );
 			}
-			newstr_empty( &part );
+			str_empty( &part );
 		}
 	}
 
@@ -253,7 +253,7 @@ output_name( FILE *outptr, char *p, int level )
 		output_tag( outptr, lvl2indent(incr_level(level,1)), "namePart", suffix.data, TAG_OPENCLOSE, TAG_NEWLINE, "type", "suffix", NULL );
 	}
 
-	newstrs_free( &part, &family, &suffix, NULL );
+	strs_free( &part, &family, &suffix, NULL );
 }
 
 
@@ -310,19 +310,19 @@ output_names( fields *f, FILE *outptr, int level )
 	};
 	int i, n, nfields, ntypes = sizeof( names ) / sizeof( convert );
 	int f_asis, f_corp, f_conf;
-	newstr role;
+	str role;
 
-	newstr_init( &role );
+	str_init( &role );
 	nfields = fields_num( f );
 	for ( n=0; n<ntypes; ++n ) {
 		for ( i=0; i<nfields; ++i ) {
 			if ( fields_level( f, i )!=level ) continue;
 			if ( f->data[i].len==0 ) continue;
 			f_asis = f_corp = f_conf = 0;
-			newstr_strcpy( &role, f->tag[i].data );
-			if ( newstr_findreplace( &role, ":ASIS", "" )) f_asis=1;
-			if ( newstr_findreplace( &role, ":CORP", "" )) f_corp=1;
-			if ( newstr_findreplace( &role, ":CONF", "" )) f_conf=1;
+			str_strcpyc( &role, f->tag[i].data );
+			if ( str_findreplace( &role, ":ASIS", "" )) f_asis=1;
+			if ( str_findreplace( &role, ":CORP", "" )) f_corp=1;
+			if ( str_findreplace( &role, ":CONF", "" )) f_conf=1;
 			if ( strcasecmp( role.data, names[n].internal ) )
 				continue;
 			if ( f_asis ) {
@@ -347,7 +347,7 @@ output_names( fields *f, FILE *outptr, int level )
 			fields_setused( f, i );
 		}
 	}
-	newstr_free( &role );
+	str_free( &role );
 }
 
 /* datepos[ NUM_DATE_TYPES ]
@@ -413,7 +413,7 @@ find_dateinfo( fields *f, int level, int datepos[ NUM_DATE_TYPES ] )
 static void
 output_datepieces( fields *f, FILE *outptr, int pos[ NUM_DATE_TYPES ] )
 {
-	newstr *s;
+	str *s;
 	int i;
 
 	for ( i=0; i<3 && pos[i]!=-1; ++i ) {
@@ -861,6 +861,11 @@ output_key( fields *f, FILE *outptr, int level )
 		if ( !strcasecmp( f->tag[i].data, "KEYWORD" ) ) {
 			output_tag( outptr, lvl2indent(level),               "subject", NULL, TAG_OPEN,      TAG_NEWLINE, NULL );
 			output_fil( outptr, lvl2indent(incr_level(level,1)), "topic",   f, i, TAG_OPENCLOSE, TAG_NEWLINE, NULL );
+			output_tag( outptr, lvl2indent(level),               "subject", NULL, TAG_CLOSE,     TAG_NEWLINE, NULL );
+		}
+		else if ( !strcasecmp( f->tag[i].data, "EPRINTCLASS" ) ) {
+			output_tag( outptr, lvl2indent(level),               "subject", NULL, TAG_OPEN,      TAG_NEWLINE, NULL );
+			output_fil( outptr, lvl2indent(incr_level(level,1)), "topic",   f, i, TAG_OPENCLOSE, TAG_NEWLINE, "class", "primary", NULL );
 			output_tag( outptr, lvl2indent(level),               "subject", NULL, TAG_CLOSE,     TAG_NEWLINE, NULL );
 		}
 	}

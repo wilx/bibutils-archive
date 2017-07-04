@@ -1,7 +1,7 @@
 /*
  * notes.h
  *
- * Copyright (c) Chris Putnam 2016
+ * Copyright (c) Chris Putnam 2016-2017
  *
  * Source code released under the GPL version 2
  *
@@ -11,7 +11,7 @@
 
 #include "bibutils.h"
 
-int notes_add( fields *bibout, newstr *invalue, int level );
+int notes_add( fields *bibout, str *invalue, int level );
 
 #endif
 

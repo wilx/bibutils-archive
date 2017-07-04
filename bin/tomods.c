@@ -1,15 +1,15 @@
 /*
  * tomods.c
  *
- * Copyright (c) Chris Putnam 2004-2016
+ * Copyright (c) Chris Putnam 2004-2017
  *
- * Source code released under the GPL version 2
+ * Program and source code released under the GPL version 2
  *
  */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "list.h"
+#include "slist.h"
 #include "bibl.h"
 #include "bibutils.h"
 #include "tomods.h"

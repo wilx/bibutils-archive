@@ -9,7 +9,7 @@
  * is_doi()
  * Check for DOI buried in another field.
  *
- * Copyright (c) Chris Putnam 2008-2016
+ * Copyright (c) Chris Putnam 2008-2017
  *
  * Source code released under the GPL version 2
  *
@@ -22,28 +22,28 @@
 #include "url.h"
 
 static void
-construct_url( char *prefix, newstr *id, newstr *id_url, char sep )
+construct_url( char *prefix, str *id, str *id_url, char sep )
 {
-	if ( !strncasecmp( id->data, "http:", 5 ) )
-		newstr_newstrcpy( id_url, id );
+	if ( !strncasecmp( str_cstr( id ), "http:", 5 ) )
+		str_strcpy( id_url, id );
 	else {
-		newstr_strcpy( id_url, prefix );
+		str_strcpyc( id_url, prefix );
 		if ( sep!='\0' ) {
-			if ( id->data[0]!=sep ) newstr_addchar( id_url, sep );
+			if ( id->data[0]!=sep ) str_addchar( id_url, sep );
 		}
-		newstr_newstrcat( id_url, id );
+		str_strcat( id_url, id );
 	}
 }
 
 static int
-url_exists( fields *f, char *urltag, newstr *doi_url )
+url_exists( fields *f, char *urltag, str *doi_url )
 {
 	int i, n;
 	if ( urltag ) {
 		n = fields_num( f );
 		for ( i=0; i<n; ++i ) {
 			if ( strcmp( fields_tag( f, i, FIELDS_CHRP ), urltag ) ) continue;
-			if ( strcmp( fields_value( f, i, FIELDS_CHRP ), doi_url->data ) ) continue;
+			if ( strcmp( fields_value( f, i, FIELDS_CHRP ), str_cstr( doi_url ) ) ) continue;
 			return 1;
 		}
 	}
@@ -51,40 +51,40 @@ url_exists( fields *f, char *urltag, newstr *doi_url )
 }
 
 static void
-xxx_to_url( fields *f, int n, char *http_prefix, char *urltag, newstr *xxx_url, char sep )
+xxx_to_url( fields *f, int n, char *http_prefix, char *urltag, str *xxx_url, char sep )
 {
-	newstr_empty( xxx_url );
+	str_empty( xxx_url );
 	construct_url( http_prefix, fields_value( f, n, FIELDS_STRP ), xxx_url, sep );
 	if ( url_exists( f, urltag, xxx_url ) )
-		newstr_empty( xxx_url );
+		str_empty( xxx_url );
 }
 void
-doi_to_url( fields *f, int n, char *urltag, newstr *url )
+doi_to_url( fields *f, int n, char *urltag, str *url )
 {
 	xxx_to_url( f, n, "http://dx.doi.org", urltag, url, '/' );
 }
 void
-jstor_to_url( fields *f, int n, char *urltag, newstr *url )
+jstor_to_url( fields *f, int n, char *urltag, str *url )
 {
 	xxx_to_url( f, n, "http://www.jstor.org/stable", urltag, url, '/' );
 }
 void
-pmid_to_url( fields *f, int n, char *urltag, newstr *url )
+pmid_to_url( fields *f, int n, char *urltag, str *url )
 {
 	xxx_to_url( f, n, "http://www.ncbi.nlm.nih.gov/pubmed", urltag, url, '/' );
 }
 void
-pmc_to_url( fields *f, int n, char *urltag, newstr *url )
+pmc_to_url( fields *f, int n, char *urltag, str *url )
 {
 	xxx_to_url( f, n, "http://www.ncbi.nlm.nih.gov/pmc/articles", urltag, url, '/' );
 }
 void
-arxiv_to_url( fields *f, int n, char *urltag, newstr *url )
+arxiv_to_url( fields *f, int n, char *urltag, str *url )
 {
 	xxx_to_url( f, n, "http://arxiv.org/abs", urltag, url, '/' );
 }
 void
-mrnumber_to_url( fields *f, int n, char *urltag, newstr *url )
+mrnumber_to_url( fields *f, int n, char *urltag, str *url )
 {
 	xxx_to_url( f, n, "http://www.ams.org/mathscinet-getitem?mr=", urltag, url, '\0' );
 }
@@ -243,15 +243,16 @@ urls_split_and_add( char *value_in, fields *out, int lvl_out )
 static int
 urls_merge_and_add_type( fields *out, char *tag_out, int lvl_out, char *prefix, vplist *values )
 {
-	int i, fstatus, status = BIBL_OK;
-	newstr url;
+	int fstatus, status = BIBL_OK;
+	vplist_index i;
+	str url;
 
-	newstr_init( &url );
+	str_init( &url );
 
 	for ( i=0; i<values->n; ++i ) {
-		newstr_strcpy( &url, prefix );
-		newstr_strcat( &url, ( char * ) vplist_get( values, i ) );
-		fstatus = fields_add( out, tag_out, newstr_cstr( &url ), lvl_out );
+		str_strcpyc( &url, prefix );
+		str_strcatc( &url, ( char * ) vplist_get( values, i ) );
+		fstatus = fields_add( out, tag_out, str_cstr( &url ), lvl_out );
 		if ( fstatus!=FIELDS_OK ) {
 			status = BIBL_ERR_MEMERR;
 			goto out;
@@ -259,7 +260,7 @@ urls_merge_and_add_type( fields *out, char *tag_out, int lvl_out, char *prefix, 
 
 	}
 out:
-	newstr_free( &url );
+	str_free( &url );
 	return status;
 }
 
@@ -273,7 +274,7 @@ out:
  * like bibtex ought to do special things with DOI, ARXIV, MRNUMBER, and the like.
  */
 int
-urls_merge_and_add( fields *in, int lvl_in, fields *out, char *tag_out, int lvl_out, list *types )
+urls_merge_and_add( fields *in, int lvl_in, fields *out, char *tag_out, int lvl_out, slist *types )
 {
 	int i, j, status = BIBL_OK;
 	char *tag, *prefix, *empty="";
@@ -283,7 +284,7 @@ urls_merge_and_add( fields *in, int lvl_in, fields *out, char *tag_out, int lvl_
 
 	for ( i=0; i<types->n; ++i ) {
 
-		tag = list_getc( types, i );
+		tag = slist_cstr( types, i );
 
 		/* ...look for data of requested type; if not found skip */
 		vplist_empty( &a );

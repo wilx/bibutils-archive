@@ -1,7 +1,7 @@
 /*
  * endin.c
  *
- * Copyright (c) Chris Putnam 2003-2016
+ * Copyright (c) Chris Putnam 2003-2017
  *
  * Program and source code released under the GPL version 2
  *
@@ -11,8 +11,8 @@
 #include <string.h>
 #include <ctype.h>
 #include "is_ws.h"
-#include "newstr.h"
-#include "newstr_conv.h"
+#include "str.h"
+#include "str_conv.h"
 #include "fields.h"
 #include "url.h"
 #include "reftypes.h"
@@ -26,7 +26,7 @@ extern int end_nall;
  PUBLIC: void endin_initparams()
 *****************************************************/
 
-static int endin_readf( FILE *fp, char *buf, int bufsize, int *bufpos, newstr *line, newstr *reference, int *fcharset );
+static int endin_readf( FILE *fp, char *buf, int bufsize, int *bufpos, str *line, str *reference, int *fcharset );
 static int endin_processf( fields *endin, char *p, char *filename, long nref, param *pm );
 int endin_typef( fields *endin, char *filename, int nrefs, param *p );
 int endin_convertf( fields *endin, fields *info, int reftype, param *p );
@@ -54,8 +54,8 @@ endin_initparams( param *p, const char *progname )
 	p->all      = end_all;
 	p->nall     = end_nall;
 
-	list_init( &(p->asis) );
-	list_init( &(p->corps) );
+	slist_init( &(p->asis) );
+	slist_init( &(p->corps) );
 
 	if ( !progname ) p->progname = NULL;
 	else p->progname = strdup( progname );
@@ -84,14 +84,14 @@ endin_istag( char *buf )
 }
 
 static int
-readmore( FILE *fp, char *buf, int bufsize, int *bufpos, newstr *line )
+readmore( FILE *fp, char *buf, int bufsize, int *bufpos, str *line )
 {
 	if ( line->len ) return 1;
-	else return newstr_fget( fp, buf, bufsize, bufpos, line );
+	else return str_fget( fp, buf, bufsize, bufpos, line );
 }
 
 static int
-endin_readf( FILE *fp, char *buf, int bufsize, int *bufpos, newstr *line, newstr *reference, int *fcharset )
+endin_readf( FILE *fp, char *buf, int bufsize, int *bufpos, str *line, str *reference, int *fcharset )
 {
 	int haveref = 0, inref = 0;
 	unsigned char *up;
@@ -116,14 +116,14 @@ endin_readf( FILE *fp, char *buf, int bufsize, int *bufpos, newstr *line, newstr
 		}
 		/* Each reference starts with a tag && ends with a blank line */
 		if ( endin_istag( p ) ) {
-			if ( reference->len ) newstr_addchar( reference, '\n' );
-			newstr_strcat( reference, p );
+			if ( reference->len ) str_addchar( reference, '\n' );
+			str_strcatc( reference, p );
 			inref = 1;
 		} else if ( inref && p ) {
-			newstr_addchar( reference, '\n' );
-		   	newstr_strcat( reference, p );
+			str_addchar( reference, '\n' );
+			str_strcatc( reference, p );
 		}
-		newstr_empty( line );
+		str_empty( line );
 	}
 	if ( reference->len ) haveref = 1;
 	return haveref;
@@ -133,20 +133,20 @@ endin_readf( FILE *fp, char *buf, int bufsize, int *bufpos, newstr *line, newstr
  PUBLIC: int endin_processf()
 *****************************************************/
 static char*
-process_endline( newstr *tag, newstr *data, char *p )
+process_endline( str *tag, str *data, char *p )
 {
 	int  i;
 
 	i = 0;
 	while ( i<2 && *p ) {
-		newstr_addchar( tag, *p++);
+		str_addchar( tag, *p++);
 		i++;
 	}
 	while ( *p==' ' || *p=='\t' ) p++;
 
 	while ( *p && *p!='\r' && *p!='\n' )
-		newstr_addchar( data, *p++ );
-	newstr_trimendingws( data );
+		str_addchar( data, *p++ );
+	str_trimendingws( data );
 
 	while ( *p=='\r' || *p=='\n' ) p++;
 
@@ -154,12 +154,12 @@ process_endline( newstr *tag, newstr *data, char *p )
 }
 
 static char *
-process_endline2( newstr *tag, newstr *data, char *p )
+process_endline2( str *tag, str *data, char *p )
 {
 	while ( *p==' ' || *p=='\t' ) p++;
 	while ( *p && *p!='\r' && *p!='\n' )
-		newstr_addchar( data, *p++ );
-	newstr_trimendingws( data );
+		str_addchar( data, *p++ );
+	str_trimendingws( data );
 	while ( *p=='\r' || *p=='\n' ) p++;
 	return p;
 }
@@ -167,32 +167,32 @@ process_endline2( newstr *tag, newstr *data, char *p )
 static int
 endin_processf( fields *endin, char *p, char *filename, long nref, param *pm )
 {
-	newstr tag, data;
+	str tag, data;
 	int status, n;
-	newstrs_init( &tag, &data, NULL );
+	strs_init( &tag, &data, NULL );
 	while ( *p ) {
-		newstrs_empty( &tag, &data, NULL );
+		strs_empty( &tag, &data, NULL );
 		if ( endin_istag( p ) ) {
 			p = process_endline( &tag, &data, p );
-			if ( data.len==0 ) continue;
-			status = fields_add( endin, tag.data, data.data, 0 );
+			if ( str_is_empty( &data ) ) continue;
+			status = fields_add( endin, str_cstr( &tag ), str_cstr( &data ), 0 );
 			if ( status!=FIELDS_OK ) return 0;
 		} else {
 			p = process_endline2( &tag, &data, p );
 			/* endnote puts %K only on 1st line of keywords */
 			n = fields_num( endin );
-			if ( n>0 && data.len ) {
+			if ( n>0 && str_has_value( &data ) ) {
 			if ( !strncmp( endin->tag[n-1].data, "%K", 2 ) ) {
-				status = fields_add( endin, "%K", data.data, 0 );
+				status = fields_add( endin, "%K", str_cstr( &data ), 0 );
 				if ( status!=FIELDS_OK ) return 0;
 			} else {
-				newstr_addchar( &(endin->data[n-1]), ' ' );
-				newstr_strcat( &(endin->data[n-1]), data.data );
+				str_addchar( &(endin->data[n-1]), ' ' );
+				str_strcat( &(endin->data[n-1]), &data );
 			}
 			}
 		}
 	}
-	newstrs_free( &tag, &data, NULL );
+	strs_free( &tag, &data, NULL );
 	return 1;
 }
 
@@ -246,43 +246,44 @@ endin_typef( fields *endin, char *filename, int nrefs, param *p )
 *****************************************************/
 
 /* Wiley puts multiple authors separated by commas on the %A lines.
- * We can detect this by finding the terminal comma in the data.
+ * We can detect this by finding the terminal comma in the value
+ * from the tag/value pair.
  *
  * "%A" "Author A. X. Last, Author N. B. Next,"
  */
 static int
 is_wiley_author( fields *endin, int n )
 {
-	newstr *t, *d;
-	t = &(endin->tag[n]);
-	if ( !t->data || strcmp( t->data, "%A" ) ) return 0;
-	d = &( endin->data[n] );
-	if ( !(d->data) || d->len==0 ) return 0;
-	if ( d->data[d->len-1]!=',' ) return 0;
+	str *t, *v;
+	t = fields_tag( endin, n, FIELDS_STRP_NOUSE );
+	if ( str_is_empty( t ) || strcmp( t->data, "%A" ) ) return 0;
+	v = fields_value( endin, n, FIELDS_STRP_NOUSE );
+	if ( str_is_empty( v ) ) return 0;
+	if ( v->data[v->len-1]!=',' ) return 0;
 	return 1;
 }
 
 static int
 cleanup_wiley_author( fields *endin, int n )
 {	
-	newstr *instring, copy, name;
+	str *instring, copy, name;
 	int status, nauthor = 0;
 	char *p;
 
-	newstrs_init( &copy, &name, NULL );
+	strs_init( &copy, &name, NULL );
 
 	instring = &( endin->data[n] );
-	newstr_newstrcpy( &copy, instring );
+	str_strcpy( &copy, instring );
 
 	p = copy.data;
 	while ( *p ) {
 		if ( *p==',' ) {
-			if ( newstr_memerr( &name ) )
+			if ( str_memerr( &name ) )
 				return BIBL_ERR_MEMERR;
 			if ( nauthor==0 ) {
 				/* ...replace the first author in the field */
-				newstr_newstrcpy( instring, &name );
-				if ( newstr_memerr( instring ) )
+				str_strcpy( instring, &name );
+				if ( str_memerr( instring ) )
 					return BIBL_ERR_MEMERR;
 			} else {
 				status = fields_add( endin, endin->tag[n].data,
@@ -290,17 +291,17 @@ cleanup_wiley_author( fields *endin, int n )
 				if ( status!=FIELDS_OK )
 					return BIBL_ERR_MEMERR;
 			}
-			newstr_empty( &name );
+			str_empty( &name );
 			nauthor++;
 			p++;
 			while ( is_ws( *p ) ) p++;
 		} else {
-			newstr_addchar( &name, *p );
+			str_addchar( &name, *p );
 			p++;
 		}
 	}
 
-	newstrs_free( &copy, &name, NULL );
+	strs_free( &copy, &name, NULL );
 	return BIBL_OK;
 }
 
@@ -373,7 +374,7 @@ month_convert( char *in, char *out )
 }
 
 static int
-endin_date( fields *bibin, int n, newstr *intag, newstr *invalue, int level, param *pm, char *outtag, fields *bibout )
+endin_date( fields *bibin, int n, str *intag, str *invalue, int level, param *pm, char *outtag, fields *bibout )
 {
 	char *tags[3][2] = {
 		{ "DATE:YEAR",  "PARTDATE:YEAR" },
@@ -383,18 +384,18 @@ endin_date( fields *bibin, int n, newstr *intag, newstr *invalue, int level, par
 	char *p = invalue->data;
 	char month[10], *m;
 	int part, status;
-	newstr date;
+	str date;
 
-	newstr_init( &date );
+	str_init( &date );
 
 	if ( !strncasecmp( outtag, "PART", 4 ) ) part = 1;
 	else part = 0;
 
 	/* %D YEAR */
 	if ( !strcasecmp( intag->data, "%D" ) ) {
-		newstr_cpytodelim( &date, skip_ws( p ), "", 0 );
-		if ( newstr_memerr( &date ) ) return BIBL_ERR_MEMERR;
-		if ( date.len>0 ) {
+		str_cpytodelim( &date, skip_ws( p ), "", 0 );
+		if ( str_memerr( &date ) ) return BIBL_ERR_MEMERR;
+		if ( str_has_value( &date ) ) {
 			status = fields_add( bibout, tags[0][part], date.data, level );
 			if ( status!=FIELDS_OK ) return BIBL_ERR_MEMERR;
 		}
@@ -406,11 +407,11 @@ endin_date( fields *bibin, int n, newstr *intag, newstr *invalue, int level, par
 	else if ( !strcasecmp( intag->data, "%8" ) ) {
 
 		/* ...get month */
-		p = newstr_cpytodelim( &date, skip_ws( p ), " ,\n", 0 );
-		if ( newstr_memerr( &date ) ) return BIBL_ERR_MEMERR;
-		if ( date.len>0 ) {
+		p = str_cpytodelim( &date, skip_ws( p ), " ,\n", 0 );
+		if ( str_memerr( &date ) ) return BIBL_ERR_MEMERR;
+		if ( str_has_value( &date ) ) {
 			if ( month_convert( date.data, month ) ) m = month;
-			else m = date.data;
+			else m = str_cstr( &date );
 			status = fields_add( bibout, tags[1][part], m, level );
 			if ( status!=FIELDS_OK ) return BIBL_ERR_MEMERR;
 		}
@@ -419,8 +420,8 @@ endin_date( fields *bibin, int n, newstr *intag, newstr *invalue, int level, par
 		if ( *p==',' ) p++;
 
 		/* ...get days */
-		p = newstr_cpytodelim( &date, skip_ws( p ), ",\n", 0 );
-		if ( newstr_memerr( &date ) ) return BIBL_ERR_MEMERR;
+		p = str_cpytodelim( &date, skip_ws( p ), ",\n", 0 );
+		if ( str_memerr( &date ) ) return BIBL_ERR_MEMERR;
 		if ( date.len>0 && date.len<3 ) {
 			status = fields_add( bibout, tags[2][part], date.data, level );
 			if ( status!=FIELDS_OK ) return BIBL_ERR_MEMERR;
@@ -433,19 +434,19 @@ endin_date( fields *bibin, int n, newstr *intag, newstr *invalue, int level, par
 		if ( *p==',' ) p++;
 
 		/* ...get year */
-		p = newstr_cpytodelim( &date, skip_ws( p ), " \t\n\r", 0 );
-		if ( newstr_memerr( &date ) ) return BIBL_ERR_MEMERR;
-		if ( date.len > 0 ) {
+		p = str_cpytodelim( &date, skip_ws( p ), " \t\n\r", 0 );
+		if ( str_memerr( &date ) ) return BIBL_ERR_MEMERR;
+		if ( str_has_value( &date ) ) {
 			status = fields_add( bibout, tags[0][part], date.data, level );
 			if ( status!=FIELDS_OK ) return BIBL_ERR_MEMERR;
 		}
 	}
-	newstr_free( &date );
+	str_free( &date );
 	return BIBL_OK;
 }
 
 static int
-endin_type( fields *bibin, int n, newstr *intag, newstr *invalue, int level, param *pm, char *outtag, fields *bibout )
+endin_type( fields *bibin, int n, str *intag, str *invalue, int level, param *pm, char *outtag, fields *bibout )
 {
 	lookups types[] = {
 		{ "GENERIC",                "ARTICLE" },
@@ -504,7 +505,7 @@ endin_notag( param *p, char *tag, char *data )
 int
 endin_convertf( fields *bibin, fields *bibout, int reftype, param *p )
 {
-	static int (*convertfns[NUM_REFTYPES])(fields *, int, newstr *, newstr *, int, param *, char *, fields *) = {
+	static int (*convertfns[NUM_REFTYPES])(fields *, int, str *, str *, int, param *, char *, fields *) = {
 		[ 0 ... NUM_REFTYPES-1 ] = generic_null,
 		[ SIMPLE       ] = generic_simple,
 		[ TITLE        ] = generic_title,
@@ -519,7 +520,7 @@ endin_convertf( fields *bibin, fields *bibout, int reftype, param *p )
 
 	int i, level, process, nfields, fstatus, status = BIBL_OK;
 	char *outtag;
-	newstr *intag, *invalue;
+	str *intag, *invalue;
 
 	nfields = fields_num( bibin );
 	for ( i=0; i<nfields; ++i ) {
@@ -538,14 +539,14 @@ endin_convertf( fields *bibin, fields *bibout, int reftype, param *p )
 		 * that doesn't, assume that it comes from endx2xml
 		 * and just copy and paste to output
 		 */
-		if ( intag->len && intag->data[0]!='%' ) {
-			fstatus = fields_add( bibout, intag->data, invalue->data, bibin->level[i] );
+		if ( str_has_value( intag ) && intag->data[0]!='%' ) {
+			fstatus = fields_add( bibout, str_cstr( intag ), str_cstr( invalue ), bibin->level[i] );
 			if ( fstatus!=FIELDS_OK ) return BIBL_ERR_MEMERR;
 			continue;
 		}
 
-		if ( !translate_oldtag( intag->data, reftype, p->all, p->nall, &process, &level, &outtag ) ) {
-			endin_notag( p, intag->data, invalue->data );
+		if ( !translate_oldtag( str_cstr( intag ), reftype, p->all, p->nall, &process, &level, &outtag ) ) {
+			endin_notag( p, str_cstr( intag ), str_cstr( invalue ) );
 			continue;
 		}
 

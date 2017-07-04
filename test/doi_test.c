@@ -1,14 +1,14 @@
 /*
  * doi_test.c
  *
- * Copyright (c) 2016
+ * Copyright (c) 2016-2017
  *
  * Source code released under the GPL version 2
  *
  */
 #include <stdio.h>
 #include <stdlib.h>
-#include "doi.h"
+#include "url.h"
 
 char progname[] = "doi_test";
 
