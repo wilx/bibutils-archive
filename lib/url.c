@@ -3,7 +3,7 @@
  *
  * doi_to_url()
  * Handle outputing DOI as a URL (Endnote and RIS formats)
- *     1) Append http://dx.doi.org as necessary
+ *     1) Append https://doi.org as necessary
  *     2) Check for overlap with pre-existing URL for the DOI
  *
  * is_doi()
@@ -61,7 +61,7 @@ xxx_to_url( fields *f, int n, char *http_prefix, char *urltag, str *xxx_url, cha
 void
 doi_to_url( fields *f, int n, char *urltag, str *url )
 {
-	xxx_to_url( f, n, "http://dx.doi.org", urltag, url, '/' );
+	xxx_to_url( f, n, "https://doi.org", urltag, url, '/' );
 }
 void
 jstor_to_url( fields *f, int n, char *urltag, str *url )
@@ -135,7 +135,7 @@ int
 is_uri_remote_scheme( char *p )
 {
 	char *scheme[]   = { "http:", "https:", "ftp:", "git:", "gopher:" };
-	int  schemelen[] = { 5,       6,         4,       4,     7 };
+	int  schemelen[] = { 5,       6,        4,      4,      7         };
         int i, nschemes = sizeof( scheme ) / sizeof( scheme[0] );
         for ( i=0; i<nschemes; ++i ) {
                 if ( !strncasecmp( p, scheme[i], schemelen[i] ) ) return schemelen[i];
@@ -147,7 +147,7 @@ int
 is_reference_database( char *p )
 {
 	char *scheme[]   = { "arXiv:", "pubmed:", "medline:", "isi:" };
-	int  schemelen[] = { 6,        7,         8,          4 };
+	int  schemelen[] = { 6,        7,         8,          4      };
         int i, nschemes = sizeof( scheme ) / sizeof( scheme[0] );
         for ( i=0; i<nschemes; ++i ) {
                 if ( !strncasecmp( p, scheme[i], schemelen[i] ) ) return schemelen[i];
@@ -159,7 +159,7 @@ is_reference_database( char *p )
 int
 is_embedded_link( char *s )
 {
-	if ( is_uri_remote_scheme( s ) != -1 ) return 1;
+	if ( is_uri_remote_scheme( s )  != -1 ) return 1;
 	if ( is_reference_database( s ) != -1 ) return 1;
 	if ( is_doi( s ) !=-1 ) return 1;
 	return 0;
@@ -172,9 +172,10 @@ typedef struct url_t {
 } url_t;
 
 static url_t prefixes[] = {
-        /*              00000000001111111112222222222333333333344444444445 */
-        /*              12345678901234567890123456789012345678901234567890 */
+	/*              00000000001111111112222222222333333333344444444445 */
+	/*              12345678901234567890123456789012345678901234567890 */
 	{ "ARXIV",     "http://arxiv.org/abs/",                     21 },
+	{ "DOI",       "https://doi.org/",                          16 },
 	{ "DOI",       "http://dx.doi.org/",                        18 },
 	{ "JSTOR",     "http://www.jstor.org/stable/",              28 },
 	{ "MRNUMBER",  "http://www.ams.org/mathscinet-getitem?mr=", 41 },
@@ -186,8 +187,8 @@ static int nprefixes = sizeof( prefixes ) / sizeof( prefixes[0] );
 
 /* do not add, but recognize */
 static url_t extraprefixes[] = {
-        /*              00000000001111111112222222222333333333344444444445 */
-        /*              12345678901234567890123456789012345678901234567890 */
+	/*              00000000001111111112222222222333333333344444444445 */
+	/*              12345678901234567890123456789012345678901234567890 */
 	{ "ARXIV",     "arXiv:",                                     6 },
 	{ "JSTOR",     "jstor:",                                     6 },
 	{ "PMID",      "pmid:",                                      5 },

@@ -614,7 +614,7 @@ output_citeparts( fields *info, FILE *outptr, int level, int max, int type )
 		{ "ARXIV",           "b:Url",     "http://arxiv.org/abs/",        LEVEL_ANY },
 		{ "PMID",            "b:Url",     "http://www.ncbi.nlm.nih.gov/pubmed/", LEVEL_ANY },
 		{ "PMC",             "b:Url",     "http://www.ncbi.nlm.nih.gov/pmc/articles/", LEVEL_ANY },
-		{ "DOI",             "b:Url",     "http://dx.doi.org/", LEVEL_ANY },
+		{ "DOI",             "b:Url",     "https://doi.org/", LEVEL_ANY },
 		{ "MRNUMBER",        "b:Url",     "http://www.ams.org/mathscinet-getitem?mr=", LEVEL_ANY },
 	};
 	int nparts=sizeof(parts)/sizeof(convert);

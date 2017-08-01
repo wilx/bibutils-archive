@@ -16,6 +16,7 @@
 #include "name.h"
 #include "title.h"
 #include "url.h"
+#include "utf8.h"
 #include "serialno.h"
 #include "reftypes.h"
 #include "bibformats.h"
@@ -73,6 +74,12 @@ risin_initparams( param *p, const char *progname )
     character 4 = space (ansi 32)
     character 5 = dash (ansi 45)
     character 6 = space (ansi 32)
+
+  some sources don't have a space at character 6 if there
+  is no data (such as "ER  -" records). Handle this.
+
+  www.omicsonline.org mangles the RIS specification and
+  puts _three_ spaces before the dash.  Handle this too.
 */
 static int
 is_ris_tag( char *buf )
@@ -82,9 +89,38 @@ is_ris_tag( char *buf )
 		return 0;
 	if (buf[2]!=' ') return 0;
 	if (buf[3]!=' ') return 0;
-	if (buf[4]!='-') return 0;
-	if (buf[5]!=' ' && buf[5]!='\0' && buf[5]!='\n' && buf[5]!='\r' ) return 0;
-	return 1;
+
+	/*...RIS fits specifications with two spaces */
+	if (buf[4]=='-') {
+		if ( buf[5]==' ' || buf[5]=='\0' || buf[5]=='\n' || buf[5]=='\r' ) return 1;
+	}
+
+	/* ...extra space in tag? */
+	else if (buf[4]==' ') {
+		if ( buf[5]=='-' && ( buf[6]==' ' || buf[6]=='\0' || buf[6]=='\n' || buf[6]=='\r' ) ) return 1;
+	}
+
+	return 0;
+}
+
+static int
+is_ris_start_tag( char *p )
+{
+	/* ...TY tag that fits specifications */
+	if ( !strncmp( p, "TY  - ",  6 ) ) return 1;
+	/* ...TY tag with an extra space? */
+	if ( !strncmp( p, "TY   - ", 7 ) ) return 1;
+	return 0;
+}
+
+static int
+is_ris_end_tag( char *p )
+{
+	/* ...ER tag that fits specifications */
+	if ( !strncmp( p, "ER  -",  5 ) ) return 1;
+	/* ...ER tag with an extra space? */
+	if ( !strncmp( p, "ER   -", 6 ) ) return 1;
+	return 0;
 }
 
 static int
@@ -98,36 +134,37 @@ static int
 risin_readf( FILE *fp, char *buf, int bufsize, int *bufpos, str *line, str *reference, int *fcharset )
 {
 	int haveref = 0, inref = 0, readtoofar = 0;
-	unsigned char *up;
 	char *p;
+
 	*fcharset = CHARSET_UNKNOWN;
+
 	while ( !haveref && readmore( fp, buf, bufsize, bufpos, line ) ) {
-		if ( !line->data || line->len==0 ) continue;
+
+		if ( str_is_empty( line ) ) continue;
+
 		p = &( line->data[0] );
-		/* Recognize UTF8 BOM */
-		up = (unsigned char * ) p;
-		if ( line->len > 2 && 
-				up[0]==0xEF && up[1]==0xBB && up[2]==0xBF ) {
+
+		if ( utf8_is_bom( p ) ) {
 			*fcharset = CHARSET_UNICODE;
 			p += 3;
 		}
-		/* Each reference starts with 'TY  - ' && 
-		 * ends with 'ER  - ' */
-		if ( strncmp(p,"TY  - ",6)==0 ) {
-			if ( !inref ) {
-				inref = 1;
-			} else {
+
+		/* References are bounded by tags 'TY  - ' && 'ER  - ' */
+		if ( is_ris_start_tag( p ) ) {
+			if ( !inref ) inref = 1;
+			else {
 				/* we've read too far.... */
 				readtoofar = 1;
 				inref = 0;
 			}
 		}
+
 		if ( is_ris_tag( p ) ) {
 			if ( !inref ) {
 				fprintf(stderr,"Warning.  Tagged line not "
 					"in properly started reference.\n");
 				fprintf(stderr,"Ignored: '%s'\n", p );
-			} else if ( !strncmp(p,"ER  -",5) ) {
+			} else if ( is_ris_end_tag( p ) ) {
 				inref = 0;
 			} else {
 				str_addchar( reference, '\n' );
@@ -135,14 +172,16 @@ risin_readf( FILE *fp, char *buf, int bufsize, int *bufpos, str *line, str *refe
 			}
 		}
 		/* not a tag, but we'll append to last values ...*/
-		else if ( inref && strncmp(p,"ER  -",5)) {
+		else if ( inref && !is_ris_end_tag( p ) ) {
 			str_addchar( reference, '\n' );
 			str_strcatc( reference, p );
 		}
 		if ( !inref && reference->len ) haveref = 1;
 		if ( !readtoofar ) str_empty( line );
 	}
+
 	if ( inref ) haveref = 1;
+
 	return haveref;
 }
 
@@ -301,7 +340,7 @@ risin_linkedfile( fields *bibin, int n, str *intag, str *invalue, int level, par
 	char *p;
 
 	/* if URL is file:///path/to/xyz.pdf, only store "///path/to/xyz.pdf" */
-	m = is_uri_file_scheme( invalue->data );
+	m = is_uri_file_scheme( str_cstr( invalue ) );
 	if ( m ) {
 		/* skip past "file:" and store only actual path */
 		p = invalue->data + m;
@@ -311,15 +350,15 @@ risin_linkedfile( fields *bibin, int n, str *intag, str *invalue, int level, par
 	}
 
 	/* if URL is http:, ftp:, etc. store as a URL */
-	m = is_uri_remote_scheme( invalue->data );
+	m = is_uri_remote_scheme( str_cstr( invalue ) );
 	if ( m!=-1 ) {
-		fstatus = fields_add( bibout, "URL", invalue->data, level );
+		fstatus = fields_add( bibout, "URL", str_cstr( invalue ), level );
 		if ( fstatus==FIELDS_OK ) return BIBL_OK;
 		else return BIBL_ERR_MEMERR;
 	}
 
 	/* badly formed, RIS wants URI, but store value anyway */
-	fstatus = fields_add( bibout, outtag, invalue->data, level );
+	fstatus = fields_add( bibout, outtag, str_cstr( invalue ), level );
 	if ( fstatus==FIELDS_OK ) return BIBL_OK;
 	else return BIBL_ERR_MEMERR;
 }
@@ -329,7 +368,7 @@ static int
 risin_doi( fields *bibin, int n, str *intag, str *invalue, int level, param *pm, char *outtag, fields *bibout )
 {
 	int fstatus, doi;
-	doi = is_doi( invalue->data );
+	doi = is_doi( str_cstr( invalue ) );
 	if ( doi!=-1 ) {
 		fstatus = fields_add( bibout, "DOI", &(invalue->data[doi]), level );
 		if ( fstatus!=FIELDS_OK ) return BIBL_ERR_MEMERR;
@@ -351,8 +390,8 @@ risin_date( fields *bibin, int n, str *intag, str *invalue, int level, param *pm
 	if ( str_memerr( &date ) ) return BIBL_ERR_MEMERR;
 	if ( *p=='/' ) p++;
 	if ( str_has_value( &date ) ) {
-		if ( part ) status = fields_add( bibout, "PARTDATE:YEAR", date.data, level );
-		else        status = fields_add( bibout, "DATE:YEAR",     date.data, level );
+		if ( part ) status = fields_add( bibout, "PARTDATE:YEAR", str_cstr( &date ), level );
+		else        status = fields_add( bibout, "DATE:YEAR",     str_cstr( &date ), level );
 		if ( status!=FIELDS_OK ) return BIBL_ERR_MEMERR;
 	}
 
@@ -361,8 +400,8 @@ risin_date( fields *bibin, int n, str *intag, str *invalue, int level, param *pm
 	if ( str_memerr( &date ) ) return BIBL_ERR_MEMERR;
 	if ( *p=='/' ) p++;
 	if ( str_has_value( &date ) ) {
-		if ( part ) status = fields_add( bibout, "PARTDATE:MONTH", date.data, level );
-		else        status = fields_add( bibout, "DATE:MONTH",     date.data, level );
+		if ( part ) status = fields_add( bibout, "PARTDATE:MONTH", str_cstr( &date ), level );
+		else        status = fields_add( bibout, "DATE:MONTH",     str_cstr( &date ), level );
 		if ( status!=FIELDS_OK ) return BIBL_ERR_MEMERR;
 	}
 
@@ -371,8 +410,8 @@ risin_date( fields *bibin, int n, str *intag, str *invalue, int level, param *pm
 	if ( str_memerr( &date ) ) return BIBL_ERR_MEMERR;
 	if ( *p=='/' ) p++;
 	if ( str_has_value( &date ) ) {
-		if ( part ) status = fields_add( bibout, "PARTDATE:DAY", date.data, level );
-		else        status = fields_add( bibout, "DATE:DAY",     date.data, level );
+		if ( part ) status = fields_add( bibout, "PARTDATE:DAY", str_cstr( &date ), level );
+		else        status = fields_add( bibout, "DATE:DAY",     str_cstr( &date ), level );
 		if ( status!=FIELDS_OK ) return BIBL_ERR_MEMERR;
 	}
 
@@ -380,12 +419,56 @@ risin_date( fields *bibin, int n, str *intag, str *invalue, int level, param *pm
 	while ( *p ) str_addchar( &date, *p++ );
 	if ( str_memerr( &date ) ) return BIBL_ERR_MEMERR;
 	if ( str_has_value( &date ) ) {
-		if ( part ) status = fields_add( bibout, "PARTDATE:OTHER", date.data,level);
-		else        status = fields_add( bibout, "DATE:OTHER", date.data, level );
+		if ( part ) status = fields_add( bibout, "PARTDATE:OTHER", str_cstr( &date ), level );
+		else        status = fields_add( bibout, "DATE:OTHER",     str_cstr( &date ), level );
 		if ( status!=FIELDS_OK ) return BIBL_ERR_MEMERR;
 	}
 	str_free( &date );
 	return BIBL_OK;
+}
+
+static int
+risin_person( fields *bibin, int n, str *intag, str *invalue, int level, param *pm, char *outtag, fields *bibout )
+{
+	int i, begin, end, ok, status = BIBL_OK;
+	slist tokens;
+	str name;
+
+	str_init( &name );
+	slist_init( &tokens );
+
+	status = slist_tokenize( &tokens, invalue, " \t\r\n", 1 );
+	if ( status!=SLIST_OK ) { status = BIBL_ERR_MEMERR; goto out; }
+
+	begin = 0;
+	while ( begin < tokens.n ) {
+
+		end = begin + 1;
+
+		while ( end < tokens.n && strcasecmp( slist_cstr( &tokens, end ), "and" ) )
+			end++;
+
+		str_empty( &name );
+		for ( i=begin; i<end; ++i ) {
+			if ( i>begin ) str_addchar( &name, ' ' );
+			str_strcat( &name, slist_str( &tokens, i ) );
+		}
+
+		ok = name_add( bibout, outtag, str_cstr( &name ), level, &(pm->asis), &(pm->corps) );
+		if ( !ok ) { status = BIBL_ERR_MEMERR; goto out; }
+
+		begin = end + 1;
+
+		/* Handle repeated 'and' errors */
+		while ( begin < tokens.n && !strcasecmp( slist_cstr( &tokens, begin ), "and" ) )
+			begin++;
+
+	}
+
+out:
+	str_free( &name );
+	slist_free( &tokens );
+	return status;
 }
 
 /* look for thesis-type hint */
@@ -430,7 +513,7 @@ risin_convertf( fields *bibin, fields *bibout, int reftype, param *p )
 		[ 0 ... NUM_REFTYPES-1 ] = generic_null,
 		[ SIMPLE       ] = generic_simple,
 		[ TITLE        ] = generic_title,
-		[ PERSON       ] = generic_person,
+		[ PERSON       ] = risin_person,
 		[ SERIALNO     ] = generic_serialno,
 		[ NOTES        ] = generic_notes,
 		[ URL          ] = generic_url,

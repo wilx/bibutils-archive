@@ -68,6 +68,8 @@ if [ $( echo $UNAME | grep Linux | wc | awk '{print $1;}' ) -eq 1 ] ; then
 		type="Linux_x86"
 	elif [ $( echo $UNAME | grep 'x86_64' | wc | awk '{print $1};') -eq 1 ] ; then
 		type="Linux_x86_64"
+	elif [ $( echo $UNAME | grep 'ppc64le' | wc | awk '{print $1};') -eq 1 ] ; then
+		type="Linux_ppc64le"
 	else
 		type="Linux_Unknown"
 	fi
@@ -134,6 +136,20 @@ elif [ "$type" = "Linux_x86_64" ] ; then
 	DYNAMICLIBEXT='.so'
 	RANLIB='ranlib'
 	POSTFIX='_amd64'
+elif [ "$type" = "Linux_ppc64le" ] ; then
+	CC='cc'
+	CFLAGS='-Wall'
+	if [ "$LIBTYPE" = "dynamic" ] ; then
+		CLIBFLAGS='-Wall -fPIC'
+	else
+		CLIBFLAGS='-Wall'
+	fi
+	EXEEXT=''
+	LIBBASE='libbibutils'
+	STATICLIBEXT='.a'
+	DYNAMICLIBEXT='.so'
+	RANLIB='ranlib'
+	POSTFIX='_ppc64le'
 elif [ "$type" = "Linux_Unknown" ] ; then
 	CC='cc'
 	CFLAGS='-Wall'

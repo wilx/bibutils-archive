@@ -1,6 +1,19 @@
 
 BIBUTILS
 
+6.1
+7/31/17
+
+BUILD
++ Fix recognition of Linux ppc64le machines (reported by Michaela Buchanan)
+
+GLOBAL
++ Handle new crossref URL for DOI's https://doi.org/ (reported by Murali Raju)
+
+RISIN
++ Handle mangled RIS sources that have three spaces in the tag instead of two
+(reported by Vaclav Haisman)
+
 6.0
 7/4/17
 

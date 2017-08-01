@@ -20,6 +20,7 @@
 #include "reftypes.h"
 #include "modstypes.h"
 #include "marc.h"
+#include "url.h"
 #include "iso639_1.h"
 #include "iso639_2.h"
 #include "iso639_3.h"
@@ -773,22 +774,29 @@ static int
 modsin_locationr( xml *node, fields *info, int level )
 {
 	int fstatus, status = BIBL_OK;
+	char *url        = "URL";
+	char *fileattach = "FILEATTACH";
 	char *tag=NULL;
 
 	if ( xml_tagexact( node, "url" ) ) {
 		if ( xml_hasattrib( node, "access", "raw object" ) )
-			tag = "FILEATTACH";
+			tag = fileattach;
 		else
-			tag = "URL";
-	} else if ( xml_tagexact( node, "physicalLocation" ) ) {
+			tag = url;
+	}
+	else if ( xml_tagexact( node, "physicalLocation" ) ) {
 		if ( xml_hasattrib( node, "type", "school" ) )
 			tag = "SCHOOL";
 		else
 			tag = "LOCATION";
 	}
 
-	if ( tag ) {
-		fstatus = fields_add( info, tag, node->value->data, level );
+	if ( tag == url ) {
+		status = urls_split_and_add( xml_value( node ), info, level );
+		if ( status!=BIBL_OK ) return status;
+	}
+	else if ( tag ) {
+		fstatus = fields_add( info, tag, xml_value( node ), level );
 		if ( fstatus!=FIELDS_OK ) return BIBL_ERR_MEMERR;
 	}
 

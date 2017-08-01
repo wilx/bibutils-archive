@@ -149,6 +149,19 @@ utf8_writebom( FILE *outptr )
 		fprintf(outptr,"%c",code[i]);
 }
 
+int
+utf8_is_bom( char *p )
+{
+	unsigned char *up = ( unsigned char * ) p;
+
+	/* ...if null-terminated string is too short, we're ok */
+	if ( up[0]!=0xEF ) return 0;
+	if ( up[1]!=0xBB ) return 0;
+	if ( up[2]!=0xBF ) return 0;
+
+	return 1;
+}
+
 /* utf8_is_emdash()
  *
  *emdash = 0xE2 (-30) 0x80 (-128) 0x94 (-108)
