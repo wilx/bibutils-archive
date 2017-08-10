@@ -1,6 +1,12 @@
 
 BIBUTILS
 
+6.2
+8/09/17
+
+DOI
++ Output as url in addition to doi for ads, bibtex, and ris formats
+
 6.1
 7/31/17
 

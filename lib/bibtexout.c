@@ -633,7 +633,7 @@ append_urls( fields *in, fields *out, int *status )
 	int lstatus;
 	slist types;
 
-	lstatus = slist_init_valuesc( &types, "URL", "PMID", "PMC", "JSTOR", NULL );
+	lstatus = slist_init_valuesc( &types, "URL", "DOI", "PMID", "PMC", "JSTOR", NULL );
 	if ( lstatus!=SLIST_OK ) {
 		*status = BIBL_ERR_MEMERR;
 		return;

@@ -176,7 +176,6 @@ static url_t prefixes[] = {
 	/*              12345678901234567890123456789012345678901234567890 */
 	{ "ARXIV",     "http://arxiv.org/abs/",                     21 },
 	{ "DOI",       "https://doi.org/",                          16 },
-	{ "DOI",       "http://dx.doi.org/",                        18 },
 	{ "JSTOR",     "http://www.jstor.org/stable/",              28 },
 	{ "MRNUMBER",  "http://www.ams.org/mathscinet-getitem?mr=", 41 },
 	{ "PMID",      "http://www.ncbi.nlm.nih.gov/pubmed/",       35 },
@@ -190,6 +189,7 @@ static url_t extraprefixes[] = {
 	/*              00000000001111111112222222222333333333344444444445 */
 	/*              12345678901234567890123456789012345678901234567890 */
 	{ "ARXIV",     "arXiv:",                                     6 },
+	{ "DOI",       "http://dx.doi.org/",                        18 },
 	{ "JSTOR",     "jstor:",                                     6 },
 	{ "PMID",      "pmid:",                                      5 },
 	{ "PMID",      "pubmed:",                                    7 },
