@@ -1,7 +1,7 @@
 /*
  * vplist_test.c
  *
- * Copyright (c) 2014-2017
+ * Copyright (c) 2014-2018
  *
  * Source code released under the GPL version 2
  *

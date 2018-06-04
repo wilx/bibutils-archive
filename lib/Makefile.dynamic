@@ -21,10 +21,11 @@ CONTAIN_OBJS  = fields.o \
                 xml_encoding.o
 
 BIBL_OBJS     = bibl.o \
+                bu_auth.o \
                 iso639_1.o \
                 iso639_2.o \
                 iso639_3.o \
-                marc.o \
+                marc_auth.o \
                 name.o \
                 notes.o \
                 pages.o \
@@ -42,7 +43,7 @@ INPUT_OBJS    = bibtexin.o bibtextypes.o \
 		isiin.o isitypes.o \
 		medin.o \
 		nbibin.o nbibtypes.o \
-		modsin.o modstypes.o marc.o \
+		modsin.o modstypes.o marc_auth.o \
 		risin.o ristypes.o \
 		ebiin.o wordin.o
 

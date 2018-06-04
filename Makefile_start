@@ -10,11 +10,12 @@ INSTALLDIR    = REPLACE_INSTALLDIR
 LIBINSTALLDIR = REPLACE_LIBINSTALLDIR
 
 MAJORVERSION  = 6
-MINORVERSION  = 2
+MINORVERSION  = 3
 VERSION       = $(MAJORVERSION).$(MINORVERSION)
-DATE          = 2017-08-09
+DATE          = 2018-06-04
 
 PROGRAMS      = bib2xml \
+		bibdiff \
                 biblatex2xml \
                 copac2xml \
                 ebi2xml \

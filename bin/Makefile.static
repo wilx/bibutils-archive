@@ -6,6 +6,7 @@ CFLAGS     = -I ../lib $(CFLAGSIN)
 
 TOMODS     = args.o bibprog.o tomods.o ../lib/modsout.o
 
+BIBDIFFIN  = bibdiff.o
 BIBTEXIN   = bib2xml.o ../lib/bibtexin.o ../lib/bibtextypes.o ../lib/generic.o
 BIBLATEXIN = biblatex2xml.o ../lib/biblatexin.o ../lib/bltypes.o ../lib/generic.o
 COPACIN    = copac2xml.o ../lib/copacin.o ../lib/copactypes.o ../lib/generic.o
@@ -34,6 +35,9 @@ all: $(PROGS)
 
 args.o : args.c
 	$(CC) $(CFLAGS) -DCURR_VERSION="\"$(VERSION)\"" -DCURR_DATE="\"$(DATE)\"" -c -o $@ $^
+
+bibdiff : $(TOMODS) $(BIBDIFFIN) ../lib/libbibutils.a ../lib/libbibcore.a
+	$(CC) $(LDFLAGS) $^ $(LOADLIBES) $(LDLIBS) -o $@
 
 bib2xml : $(TOMODS) $(BIBTEXIN) ../lib/libbibcore.a
 	$(CC) $(LDFLAGS) $^ $(LOADLIBES) $(LDLIBS) -o $@

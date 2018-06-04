@@ -1,7 +1,7 @@
 /*
  * args.c
  *
- * Copyright (c) 2004-2017
+ * Copyright (c) 2004-2018
  *
  * Source code released under the GPL version 2
  *
@@ -13,21 +13,35 @@
 #include "args.h"
 
 void
-args_tellversion( char *progname )
+args_tellversion( const char *progname )
 {
-	char bibutils_version[] = CURR_VERSION;
-	char bibutils_date[] = CURR_DATE;
+	const char bibutils_version[] = CURR_VERSION;
+	const char bibutils_date[] = CURR_DATE;
 	fprintf( stderr, "%s, ", progname );
 	fprintf( stderr, "bibutils suite version %s date %s\n", 
 		bibutils_version, bibutils_date );
 }
 
 int
-args_match( char *check, char *shortarg, char *longarg )
+args_match( const char *check, const char *shortarg, const char *longarg )
 {
 	if ( shortarg && !strcmp( check, shortarg ) ) return 1;
 	if ( longarg  && !strcmp( check, longarg  ) ) return 1;
 	return 0;
+}
+
+char *
+args_next( int argc, char *argv[], int n, const char *progname, const char *shortarg, const char *longarg )
+{
+	if ( n>=argc ) {
+		fprintf( stderr, "%s: option ", progname );
+		if ( shortarg ) fprintf( stderr, "%s", shortarg );
+		if ( shortarg && longarg ) fprintf( stderr, "/" );
+		if ( longarg ) fprintf( stderr, "%s", longarg );
+		fprintf( stderr, " takes an argument. Exiting.\n" );
+		exit( EXIT_FAILURE );
+	}
+	return argv[n+1];
 }
 
 static int

@@ -1,7 +1,7 @@
 /*
  * intlist_test.c
  *
- * Copyright (c) 2013-2017
+ * Copyright (c) 2013-2018
  *
  * Source code released under the GPL version 2
  */

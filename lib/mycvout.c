@@ -1,7 +1,7 @@
 /*
  * mycvout.c
  *
- * Copyright (c) Chris Putnam 2003-2017
+ * Copyright (c) Chris Putnam 2003-2018
  *
  * Source code released under the GPL version 2
  *
@@ -92,8 +92,8 @@ bibtexout_type( fields *info, char *filename, int refnum, param *p )
 
 	/* determine bibliography type */
 	for ( i=0; i<info->n; ++i ) {
-		if ( strcasecmp( info->tag[i].data, "GENRE" ) &&
-		     strcasecmp( info->tag[i].data, "NGENRE" ) ) continue;
+		if ( strcasecmp( info->tag[i].data, "GENRE:MARC" ) &&
+		     strcasecmp( info->tag[i].data, "GENRE:BIBUTILS" ) ) continue;
 		genre = info->data[i].data;
 		level = info->level[i];
 		if ( !strcasecmp( genre, "periodical" ) ||
@@ -112,7 +112,7 @@ bibtexout_type( fields *info, char *filename, int refnum, param *p )
 		} else if ( !strcasecmp( genre, "collection" ) ) {
 			if ( level==0 ) type=TYPE_COLLECTION;
 			else type = TYPE_INCOLLECTION;
-		} else if ( !strcasecmp( genre, "report" ) )
+		} else if ( !strcasecmp( genre, "technical report" ) )
 			type = TYPE_REPORT;
 		else if ( !strcasecmp( genre, "book" ) ) {
 			if ( level==0 ) type=TYPE_BOOK;

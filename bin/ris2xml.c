@@ -1,7 +1,7 @@
 /*
  * ris2xml.c
  *
- * Copyright (c) Chris Putnam 2003-2017
+ * Copyright (c) Chris Putnam 2003-2018
  *
  * Program and source code released under the GPL version 2
  *

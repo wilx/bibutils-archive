@@ -10,6 +10,7 @@ LDLIBS     = -lbibutils
 
 TOMODS     = bibprog.o tomods.o args.o
 
+BIBDIFFIN  = bibdiff.o
 BIBTEXIN   = bib2xml.o
 BIBLATEXIN = biblatex2xml.o
 COPACIN    = copac2xml.o
@@ -40,6 +41,9 @@ all: $(PROGS)
 
 args.o : args.c
 	$(CC) $^ -DCURR_VERSION="\"$(VERSION)\"" -DCURR_DATE="\"$(DATE)\"" $(CFLAGS) -c -o $@
+
+bibdiff : $(TOMODS) $(BIBDIFFIN)
+	$(CC) $(LDFLAGS) $^ $(LOADLIBES) $(LDLIBS) -o $@
 
 bib2xml : $(TOMODS) $(BIBTEXIN)
 	$(CC) $(LDFLAGS) $^ $(LOADLIBES) $(LDLIBS) -o $@

@@ -1,6 +1,17 @@
 
 BIBUTILS
 
+6.3
+6/04/18
++ Add bibdiff program
++ Fix header guards in iso639_1.h and iso639_3.h (reported by Vaclav Haisman)
++ Fix nbib support for bibutils as a library (reported by Vaclav Haisman)
++ Add authority="bibutilsgt" for bibutils-recognized genres not in MARC
+authority
++ Switch from GENRE/NGENRE/UGENRE to GENRE:MARC/GENRE:BIBUTILS/GENRE:UNKNOWN
++ General cleanups and fixes to cppcheck/clang warnings
++ Fix CVE-2018-10773, CVE-2018-10774, CVE-2018-10775
+
 6.2
 8/09/17
 
