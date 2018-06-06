@@ -1,6 +1,12 @@
 
 BIBUTILS
 
+6.4
+6/05/18
++ Add missing return in bibtexout.c (reported by Vaclav Haisman)
++ Fix accidentally deleted extern in xml.h to fix hs-bibutils build (reported
+by Vaclav Haisman)
+
 6.3
 6/04/18
 + Add bibdiff program
