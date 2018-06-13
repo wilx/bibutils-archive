@@ -1,6 +1,13 @@
 
 BIBUTILS
 
+6.5
++ Handle both genres "unpublished" and "manuscript" (reported by Chip Maguire)
++ Recognize all MARC role abbreviations (reported by Chip Maguire)
++ Handle Licentiate theses (reported by Chip Maguire)
++ Fix bug in nbib2xml (reported by Vaclav Haisman)
++ Fix hangs in bib2xml/biblatex2xml found by american-fuzzy-lop
+
 6.4
 6/05/18
 + Add missing return in bibtexout.c (reported by Vaclav Haisman)
