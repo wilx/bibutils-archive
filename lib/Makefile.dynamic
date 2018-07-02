@@ -1,4 +1,5 @@
 CFLAGS    = $(CFLAGSIN)
+LDFLAGS   = $(LDFLAGSIN)
 LIBTARGET = $(LIBTARGETIN)
 
 SIMPLE_OBJS   = charsets.o \
@@ -52,6 +53,7 @@ OUTPUT_OBJS   = adsout.o \
                 endout.o \
                 isiout.o \
                 modsout.o \
+		nbibout.o \
                 risout.o \
                 wordout.o
 
@@ -75,12 +77,12 @@ all: $(LIBTARGET)
 	$(CC) $(CFLAGS) -c -o $@ $<
 
 libbibutils.so: $(BIBCORE_OBJS) $(BIBUTILS_OBJS)
-	$(CC) -shared -Wl,-soname,$(SONAME) -o $(SOFULL) $^
+	$(CC) $(LDFLAGS) -shared -Wl,-soname,$(SONAME) -o $(SOFULL) $^
 	ln -sf $(SOFULL) $(SONAME)
 	ln -sf $(SOFULL) libbibutils.so
 
 bibutils.dll: $(BIBCORE_OBJS) $(BIBUTILS_OBJS)
-	$(CC) -shared -Wl,-soname,$(SONAME) -o $@ $^
+	$(CC) $(LDFLAGS) -shared -Wl,-soname,$(SONAME) -o $@ $^
 	cp $@ ../bin
 	cp $@ ../test
 

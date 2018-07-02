@@ -3,7 +3,7 @@
 #
 
 CFLAGS   = -I ../lib $(CFLAGSIN)
-LDFLAGS  = -L ../lib
+LDFLAGS  = -L ../lib $(LDFLAGSIN)
 LDLIBS   = -lbibutils
 
 PROGS    = doi_test \

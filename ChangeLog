@@ -1,7 +1,14 @@
 
 BIBUTILS
 
+6.6
+7/02/18
++ Allow distros to inject LDFLAGS via LDFLAGSIN into bibutils builds (reported
+by Jens-Ulrik Petersen)
++ Add xml2nbib converter
+
 6.5
+6/12/18
 + Handle both genres "unpublished" and "manuscript" (reported by Chip Maguire)
 + Recognize all MARC role abbreviations (reported by Chip Maguire)
 + Handle Licentiate theses (reported by Chip Maguire)

@@ -10,9 +10,9 @@ INSTALLDIR    = REPLACE_INSTALLDIR
 LIBINSTALLDIR = REPLACE_LIBINSTALLDIR
 
 MAJORVERSION  = 6
-MINORVERSION  = 5
+MINORVERSION  = 6
 VERSION       = $(MAJORVERSION).$(MINORVERSION)
-DATE          = 2018-06-12
+DATE          = 2018-07-02
 
 PROGRAMS      = bib2xml \
 		bibdiff \
@@ -30,6 +30,7 @@ PROGRAMS      = bib2xml \
                 xml2bib \
                 xml2end \
                 xml2isi \
+		xml2nbib \
                 xml2ris \
                 xml2wordbib \
                 modsclean

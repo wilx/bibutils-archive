@@ -3,6 +3,7 @@
 #
 
 CFLAGS     = -I ../lib $(CFLAGSIN)
+LDFLAGS    = $(LDFLAGSIN)
 PROGS      = doi_test \
              entities_test \
              intlist_test \

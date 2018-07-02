@@ -3,6 +3,7 @@
 #
 
 CFLAGS     = -I ../lib $(CFLAGSIN)
+LDFLAGS    = $(LDFLAGSIN)
 
 TOMODS     = args.o bibprog.o tomods.o ../lib/modsout.o
 
@@ -26,6 +27,7 @@ ADSOUT     = xml2ads.o ../lib/adsout.o
 BIBTEXOUT  = xml2bib.o ../lib/bibtexout.o
 ENDOUT     = xml2end.o ../lib/endout.o
 ISIOUT     = xml2isi.o ../lib/isiout.o
+NBIBOUT    = xml2nbib.o ../lib/nbibout.o
 RISOUT     = xml2ris.o ../lib/risout.o
 WORDOUT    = xml2wordbib.o ../lib/wordout.o
 
@@ -82,6 +84,9 @@ xml2end : $(FROMMODS) $(ENDOUT) ../lib/libbibcore.a
 	$(CC) $(LDFLAGS) $^ $(LOADLIBES) $(LDLIBS) -o $@
 
 xml2isi : $(FROMMODS) $(ISIOUT) ../lib/libbibcore.a
+	$(CC) $(LDFLAGS) $^ $(LOADLIBES) $(LDLIBS) -o $@
+
+xml2nbib : $(FROMMODS) $(NBIBOUT) ../lib/libbibcore.a
 	$(CC) $(LDFLAGS) $^ $(LOADLIBES) $(LDLIBS) -o $@
 
 xml2ris : $(FROMMODS) $(RISOUT) ../lib/libbibcore.a

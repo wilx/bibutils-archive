@@ -1,4 +1,4 @@
-CFLAGS = $(CFLAGSIN)
+CFLAGS  = $(CFLAGSIN)
 
 SIMPLE_OBJS   = charsets.o \
                 is_ws.o \
@@ -61,6 +61,7 @@ OUTPUT_OBJS   = adsout.o \
                 endout.o \
                 isiout.o \
                 modsout.o \
+		nbibout.o \
                 risout.o \
                 wordout.o
 
