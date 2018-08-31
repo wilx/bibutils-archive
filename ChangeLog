@@ -1,6 +1,18 @@
 
 BIBUTILS
 
+6.7
+8/31/18
++ Remove exit() calls from library and fully implement error tracking in 
+struct str (requested by Vasiliy Glazov)
++ Add "DOI:" to doi entries in xml2ads (reported by Richard Mathar)
++ Eliminate duplication of doi information in xml2ads (reported by Richard
+Mathar)
++ Improve handling of non-ascii letters for ADS %R tags (patch from Richard
+Mathar)
++ Suppress warnings on Windows compilers with 32 bit longs (reported by Vaclav
+Haisman)
+
 6.6
 7/02/18
 + Allow distros to inject LDFLAGS via LDFLAGSIN into bibutils builds (reported
