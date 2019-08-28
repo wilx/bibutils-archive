@@ -1,6 +1,11 @@
 
 BIBUTILS
 
+6.8
+8/27/19
++ Improve ISI output
++ Lots of cleanups
+
 6.7
 8/31/18
 + Remove exit() calls from library and fully implement error tracking in 

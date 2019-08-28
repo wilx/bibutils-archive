@@ -23,12 +23,12 @@ WORDIN     = wordbib2xml.o ../lib/wordin.o
 
 FROMMODS   = bibprog.o args.o ../lib/modsin.o
 
-ADSOUT     = xml2ads.o ../lib/adsout.o
-BIBTEXOUT  = xml2bib.o ../lib/bibtexout.o
-ENDOUT     = xml2end.o ../lib/endout.o
-ISIOUT     = xml2isi.o ../lib/isiout.o
-NBIBOUT    = xml2nbib.o ../lib/nbibout.o
-RISOUT     = xml2ris.o ../lib/risout.o
+ADSOUT     = xml2ads.o ../lib/adsout.o ../lib/generic.o
+BIBTEXOUT  = xml2bib.o ../lib/bibtexout.o ../lib/generic.o
+ENDOUT     = xml2end.o ../lib/endout.o ../lib/generic.o
+ISIOUT     = xml2isi.o ../lib/isiout.o ../lib/generic.o
+NBIBOUT    = xml2nbib.o ../lib/nbibout.o ../lib/generic.o
+RISOUT     = xml2ris.o ../lib/risout.o ../lib/generic.o
 WORDOUT    = xml2wordbib.o ../lib/wordout.o
 
 PROGS      = $(PROGSIN)

@@ -31,6 +31,7 @@ BIBL_OBJS     = bibl.o \
                 reftypes.o \
                 serialno.o \
                 title.o \
+		type.o \
                 url.o
 
 INPUT_OBJS    = bibtexin.o \

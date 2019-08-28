@@ -1,7 +1,7 @@
 /*
  * tomods.c
  *
- * Copyright (c) Chris Putnam 2004-2018
+ * Copyright (c) Chris Putnam 2004-2019
  *
  * Program and source code released under the GPL version 2
  *
@@ -67,11 +67,9 @@ tomods_processargs( int *argc, char *argv[], param *p,
 	while ( i<*argc ) {
 		subtract = 0;
 		if ( args_match( argv[i], "-h", "--help" ) ) {
-			subtract = 1;
 			args_tomods_help( p->progname, help1, help2 );
 			exit( EXIT_SUCCESS );
 		} else if ( args_match( argv[i], "-v", "--version" ) ) {
-			subtract = 1;
 			args_tellversion( p->progname );
 			exit( EXIT_SUCCESS );
 		} else if ( args_match( argv[i], "-a", "--add-refcount" ) ) {

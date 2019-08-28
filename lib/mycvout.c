@@ -1,7 +1,7 @@
 /*
  * mycvout.c
  *
- * Copyright (c) Chris Putnam 2003-2018
+ * Copyright (c) Chris Putnam 2003-2019
  *
  * Source code released under the GPL version 2
  *
@@ -20,24 +20,24 @@
 #include "bibutils.h"
 
 void
-bibtexout_initparams( param *p, const char *progname )
+bibtexout_initparams( param *pm, const char *progname )
 {
-	p->writeformat      = BIBL_BIBTEXOUT;
-	p->format_opts      = 0;
-	p->charsetout       = BIBL_CHARSET_DEFAULT;
-	p->charsetout_src   = BIBL_SRC_DEFAULT;
-	p->latexout         = 1;
-	p->utf8out          = 0;
-	p->utf8bom          = 0;
-	p->xmlout           = BIBL_XMLOUT_FALSE;
-	p->nosplittitle     = 0;
+	pm->writeformat      = BIBL_BIBTEXOUT;
+	pm->format_opts      = 0;
+	pm->charsetout       = BIBL_CHARSET_DEFAULT;
+	pm->charsetout_src   = BIBL_SRC_DEFAULT;
+	pm->latexout         = 1;
+	pm->utf8out          = 0;
+	pm->utf8bom          = 0;
+	pm->xmlout           = BIBL_XMLOUT_FALSE;
+	pm->nosplittitle     = 0;
 	p->verbose          = 0;
-	p->addcount         = 0;
-	p->singlerefperfile = 0;
+	pm->addcount         = 0;
+	pm->singlerefperfile = 0;
 
-	p->headerf = bibtexout_writeheader;
-	p->footerf = NULL;
-	p->writef  = bibtexout_write;
+	pm->headerf = bibtexout_writeheader;
+	pm->footerf = NULL;
+	pm->writef  = bibtexout_write;
 
 	if ( !p->progname && progname )
 		p->progname = strdup( progname );

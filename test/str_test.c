@@ -555,7 +555,7 @@ test_cpytodelim( str *s )
 	char str0[]="\0";
 	char str1[]="Col1\tCol2\tCol3\n";
 	char str2[]="Col1 Col2 Col3";
-	char *q;
+	const char *q;
 	int failed = 0;
 
 	q = str_cpytodelim( s, str0, "\t", 0 );
@@ -623,7 +623,7 @@ test_cattodelim( str *s )
 {
 	char str1[] = "1 1 1 1 1 1 1";
 	int failed = 0, i, n = 2;
-	char *q;
+	const char *q;
 
 	str_empty( s );
 	for ( i=0; i<n; ++i ) {

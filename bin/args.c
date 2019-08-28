@@ -1,7 +1,7 @@
 /*
  * args.c
  *
- * Copyright (c) 2004-2018
+ * Copyright (c) 2004-2019
  *
  * Source code released under the GPL version 2
  *
