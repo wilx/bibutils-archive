@@ -10,9 +10,9 @@ INSTALLDIR    = REPLACE_INSTALLDIR
 LIBINSTALLDIR = REPLACE_LIBINSTALLDIR
 
 MAJORVERSION  = 6
-MINORVERSION  = 8
+MINORVERSION  = 9
 VERSION       = $(MAJORVERSION).$(MINORVERSION)
-DATE          = 2019-08-27
+DATE          = 2020-03-17
 
 PROGRAMS      = bib2xml \
 		bibdiff \
@@ -28,6 +28,7 @@ PROGRAMS      = bib2xml \
                 wordbib2xml \
                 xml2ads \
                 xml2bib \
+		xml2biblatex \
                 xml2end \
                 xml2isi \
 		xml2nbib \

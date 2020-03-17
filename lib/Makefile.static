@@ -58,6 +58,7 @@ INPUT_OBJS    = bibtexin.o \
 		wordin.o
 
 OUTPUT_OBJS   = adsout.o \
+		biblatexout.o \
                 bibtexout.o \
                 endout.o \
                 isiout.o \

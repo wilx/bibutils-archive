@@ -1,7 +1,7 @@
 /*
  * bibprog.c
  *
- * Copyright (c) Chris Putnam 2004-2019
+ * Copyright (c) Chris Putnam 2004-2020
  *
  * Source code released under the GPL version 2
  *
@@ -34,7 +34,7 @@ bibprog( int argc, char *argv[], param *p )
 	bibl_write( &b, stdout, p );
 	fflush( stdout );
 	if( p->progname ) fprintf( stderr, "%s: ", p->progname );
-	fprintf( stderr, "Processed %ld references.\n", b.nrefs );
+	fprintf( stderr, "Processed %ld references.\n", b.n );
 	bibl_free( &b );
 }
 

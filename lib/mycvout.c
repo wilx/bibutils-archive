@@ -1,7 +1,7 @@
 /*
  * mycvout.c
  *
- * Copyright (c) Chris Putnam 2003-2019
+ * Copyright (c) Chris Putnam 2003-2020
  *
  * Source code released under the GPL version 2
  *
@@ -240,7 +240,7 @@ static void
 output_and_use( FILE *fp, fields *info, int n, char *outtag, int format_opts )
 {
 	output_element( fp, outtag, info->data[n].data, format_opts );
-	fields_setused( info, n );
+	fields_set_used( info, n );
 }
 
 static void
@@ -280,7 +280,7 @@ output_fileattach( FILE *fp, fields *info, int format_opts )
 			str_strcatc( &data, ":HTML" );
 		else str_strcatc( &data, ":TYPE" );
 		output_element( fp, "file", data.data, format_opts );
-		fields_setused( info, i );
+		fields_set_used( info, i );
 		str_empty( &data );
 	}
 	str_free( &data );
@@ -335,7 +335,7 @@ output_people( FILE *fp, fields *info, unsigned long refnum, char *tag,
 				str_strcatc( &allpeople, info->data[i].data );
 				str_addchar( &allpeople, '}' );
 			} else add_person( &allpeople, info->data[i].data ); 
-			fields_setused( info, i );
+			fields_set_used( info, i );
 			npeople++;
 		}
 	}
@@ -362,13 +362,13 @@ output_title( FILE *fp, fields *info, unsigned long refnum, char *bibtag, int le
 	if ( n1!=-1 ) {
 		str_init( &title );
 		str_strcpy( &title, &(info->data[n1]) );
-		fields_setused( info, n1 );
+		fields_set_used( info, n1 );
 		if ( n2!=-1 ) {
 			if ( info->data[n1].data[info->data[n1].len]!='?' )
 				str_strcatc( &title, ": " );
 			else str_addchar( &title, ' ' );
 			str_strcatc( &title, info->data[n2].data );
-			fields_setused( info, n2 );
+			fields_set_used( info, n2 );
 		}
 		output_element( fp, bibtag, title.data, format_opts );
 		str_free( &title );
@@ -385,7 +385,7 @@ output_date( FILE *fp, fields *info, unsigned long refnum, int format_opts )
 	if ( n==-1 ) n = fields_find( info, "PARTDATE:YEAR", -1 );
 	if ( n!=-1 ) {
 		output_element( fp, "year", info->data[n].data, format_opts );
-		fields_setused( info, n );
+		fields_set_used( info, n );
 	}
 	n = fields_find( info, "DATE:MONTH", -1 );
 	if ( n==-1 ) n = fields_find( info, "PARTDATE:MONTH", -1 );
@@ -395,13 +395,13 @@ output_date( FILE *fp, fields *info, unsigned long refnum, int format_opts )
 			output_element( fp, "month", months[month-1], format_opts );
 		else
 			output_element( fp, "month", info->data[n].data, format_opts );
-		fields_setused( info, n );
+		fields_set_used( info, n );
 	}
 	n = fields_find( info, "DATE:DAY", -1 );
 	if ( n==-1 ) n = fields_find( info, "PARTDATE:DAY", -1 );
 	if ( n!=-1 ) {
 		output_element( fp, "day", info->data[n].data, format_opts );
-		fields_setused( info, n );
+		fields_set_used( info, n );
 	}
 }
 
@@ -417,7 +417,7 @@ output_articlenumber( FILE *fp, fields *info, unsigned long refnum,
 		str_init( &pages );
 		str_strcatc( &pages, info->data[ar].data );
 		output_element( fp, "pages", pages.data, format_opts );
-		fields_setused( info, ar );
+		fields_set_used( info, ar );
 		str_free( &pages );
 	}
 }
@@ -478,7 +478,7 @@ output_pages( FILE *fp, fields *info, unsigned long refnum, int format_opts )
 	str_init( &pages );
 	if ( sn!=-1 ) {
 		str_strcat( &pages, info->data[sn].data );
-		fields_setused( info, sn );
+		fields_set_used( info, sn );
 	}
 	if ( sn!=-1 && en!=-1 ) {
 		if ( format_opts & BIBL_FORMAT_BIBOUT_SINGLEDASH ) 
@@ -488,7 +488,7 @@ output_pages( FILE *fp, fields *info, unsigned long refnum, int format_opts )
 	}
 	if ( en!=-1 ) {
 		str_strcat( &pages, info->data[en].data );
-		fields_setused( info, en );
+		fields_set_used( info, en );
 	}
 	output_element( fp, "pages", pages.data, format_opts );
 	str_free( &pages );
@@ -516,22 +516,22 @@ output_issue_number( FILE *fp, fields *info, int format_opts )
 		output_and_use( fp, info, nnumber, "number", format_opts );
 /*		output_element( fp, "issue", info->data[nissue].data, 
 				format_opts );
-		fields_setused( info, nissue );
+		fields_set_used( info, nissue );
 		output_element( fp, "number", info->data[nnumber].data, 
 				format_opts );
-		fields_setused( info, nnumber );*/
+		fields_set_used( info, nnumber );*/
 	} else if ( nissue!=-1 ) {
 		output_and_use( fp, info, nissue, "number", format_opts );
 /*
 		output_element( fp, "number", info->data[nissue].data, 
 				format_opts );
-		fields_setused( info, nissue );*/
+		fields_set_used( info, nissue );*/
 	} else if ( nnumber!=-1 ) {
 		output_and_use( fp, info, nnumber, "number", format_opts );
 /*
 		output_element( fp, "number", info->data[nnumber].data, 
 				format_opts );
-		fields_setused( info, nnumber );
+		fields_set_used( info, nnumber );
 */
 	}
 }
@@ -540,7 +540,7 @@ void
 bibtexout_write( fields *info, FILE *fp, param *p, unsigned long refnum )
 {
 	int type;
-	fields_clearused( info );
+	fields_clear_used( info );
 	type = bibtexout_type( info, "", refnum, p );
 	output_type( fp, type, p->format_opts );
 	if ( !( p->format_opts & BIBL_FORMAT_BIBOUT_DROPKEY ) )

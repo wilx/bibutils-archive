@@ -4,39 +4,40 @@
 # dynamic linkage version
 #
 
-CFLAGS     = -I ../lib $(CFLAGSIN)
-LDFLAGS    = -L ../lib $(LDFLAGSIN)
-LDLIBS     = -lbibutils
+CFLAGS      = -I ../lib $(CFLAGSIN)
+LDFLAGS     = -L ../lib $(LDFLAGSIN)
+LDLIBS      = -lbibutils
 
-TOMODS     = bibprog.o tomods.o args.o
+TOMODS      = bibprog.o tomods.o args.o
 
-BIBDIFFIN  = bibdiff.o
-BIBTEXIN   = bib2xml.o
-BIBLATEXIN = biblatex2xml.o
-COPACIN    = copac2xml.o
-EBIIN      = ebi2xml.o
-ENDIN      = end2xml.o
-ENDXIN     = endx2xml.o
-ISIIN      = isi2xml.o
-MEDIN      = med2xml.o
-MODSCLEAN  = modsclean.o
-NBIBIN     = nbib2xml.o
-RISIN      = ris2xml.o
-WORDIN     = wordbib2xml.o
+BIBDIFFIN   = bibdiff.o
+BIBTEXIN    = bib2xml.o
+BIBLATEXIN  = biblatex2xml.o
+COPACIN     = copac2xml.o
+EBIIN       = ebi2xml.o
+ENDIN       = end2xml.o
+ENDXIN      = endx2xml.o
+ISIIN       = isi2xml.o
+MEDIN       = med2xml.o
+MODSCLEAN   = modsclean.o
+NBIBIN      = nbib2xml.o
+RISIN       = ris2xml.o
+WORDIN      = wordbib2xml.o
 
-FROMMODS   = bibprog.o args.o
+FROMMODS    = bibprog.o args.o
 
-ADSOUT     = xml2ads.o
-BIBTEXOUT  = xml2bib.o
-ENDOUT     = xml2end.o
-ISIOUT     = xml2isi.o
-NBIBOUT    = xml2nbib.o
-RISOUT     = xml2ris.o
-WORDOUT    = xml2wordbib.o
+ADSOUT      = xml2ads.o
+BIBLATEXOUT = xml2biblatex.o
+BIBTEXOUT   = xml2bib.o
+ENDOUT      = xml2end.o
+ISIOUT      = xml2isi.o
+NBIBOUT     = xml2nbib.o
+RISOUT      = xml2ris.o
+WORDOUT     = xml2wordbib.o
 
 PROGS      = bib2xml biblatex2xml copac2xml ebi2xml end2xml endx2xml isi2xml \
              med2xml nbib2xml ris2xml wordbib2xml \
-             xml2ads xml2bib xml2end xml2isi xml2nbib xml2ris xml2wordbib \
+             xml2ads xml2biblatex xml2bib xml2end xml2isi xml2nbib xml2ris xml2wordbib \
              bibdiff modsclean
 
 all: $(PROGS)
@@ -81,6 +82,9 @@ wordbib2xml : $(TOMODS) $(WORDIN)
 	$(CC) $(LDFLAGS) $^ $(LOADLIBES) $(LDLIBS) -o $@
 
 xml2ads : $(FROMMODS) $(ADSOUT)
+	$(CC) $(LDFLAGS) $^ $(LOADLIBES) $(LDLIBS) -o $@
+
+xml2biblatex : $(FROMMODS) $(BIBLATEXOUT)
 	$(CC) $(LDFLAGS) $^ $(LOADLIBES) $(LDLIBS) -o $@
 
 xml2bib : $(FROMMODS) $(BIBTEXOUT)

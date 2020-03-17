@@ -1,7 +1,7 @@
 /*
  * bibdiff.c
  * 
- * Copyright (c) Chris Putnam 2017-2019
+ * Copyright (c) Chris Putnam 2017-2020
  *
  * Program and source code released under the GPL version 2
  *
@@ -115,13 +115,13 @@ compare_bibliographies( bibl *b1, const char *fname1, bibl *b2, const char *fnam
 	fields *f1, *f2;
 	long i;
 
-	if ( b1->nrefs != b2->nrefs ) {
+	if ( b1->n != b2->n ) {
 		printf( "%s: %s has %ld references and %s has %ld references\n", progname,
-			fname1, b1->nrefs, fname2, b2->nrefs );
+			fname1, b1->n, fname2, b2->n );
 		return 1;
 	}
 
-	for ( i=0; i<b1->nrefs; ++i ) {
+	for ( i=0; i<b1->n; ++i ) {
 		f1 = b1->ref[i];
 		f2 = b2->ref[i];
 		if ( compare_references( f1, fname1, f2, fname2, i+1 ) ) return 1;

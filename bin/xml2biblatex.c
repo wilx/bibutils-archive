@@ -1,5 +1,5 @@
 /*
- * xml2bib.c
+ * xml2biblatex.c
  *
  * Copyright (c) Chris Putnam 2003-2020
  *
@@ -13,22 +13,22 @@
 #include "args.h"
 #include "bibprog.h"
 
-const char progname[] = "xml2bib";
+const char progname[] = "xml2biblatex";
 
 void
 help( char *progname )
 {
 	args_tellversion( progname );
 	fprintf( stderr, "Converts the MODS XML intermediate reference file "
-			"into Bibtex\n\n");
+			"into BibLaTex\n\n");
 
-	fprintf(stderr,"usage: %s xml_file > bibtex_file\n\n",progname);
+	fprintf(stderr,"usage: %s xml_file > biblatex_file\n\n",progname);
         fprintf(stderr,"  xml_file can be replaced with file list or omitted to use as a filter\n\n");
 
 	fprintf(stderr,"  -h,  --help               display this help\n");
 	fprintf(stderr,"  -v,  --version            display version\n");
 	fprintf(stderr,"  -at, --abbreviatedtitles  use abbreviated titles, if available\n");
-	fprintf(stderr,"  -fc, --finalcomma         add final comman to bibtex output\n");
+	fprintf(stderr,"  -fc, --finalcomma         add final comman to biblatex output\n");
 	fprintf(stderr,"  -sd, --singledash         use one dash '-', not two '--', in page ranges\n" );
 	fprintf(stderr,"  -b,  --brackets           use brackets, not quotation marks surrounding data\n");
 	fprintf(stderr,"  -w,  --whitespace         use beautifying whitespace to output\n");
@@ -36,7 +36,7 @@ help( char *progname )
 	fprintf(stderr,"                            (overly strict, but useful for other programs)\n");
 	fprintf(stderr,"  -nl, --no-latex           no latex encodings; put characters in directly\n");
 	fprintf(stderr,"  -nb, --no-bom             do not write Byte Order Mark in UTF8 output\n");
-	fprintf(stderr,"  -U,  --uppercase          write bibtex tags/types in upper case\n" );
+	fprintf(stderr,"  -U,  --uppercase          write biblatex tags/types in upper case\n" );
 	fprintf(stderr,"  -s,  --single-refperfile  one reference per output file\n");
 	fprintf(stderr,"  -i, --input-encoding      interpret input file with requested character set\n" );
 	fprintf(stderr,"                            (use argument for current list)\n");
@@ -119,7 +119,7 @@ main( int argc, char *argv[] )
 {
 	param p;
 	modsin_initparams( &p, progname );
-	bibtexout_initparams( &p, progname );
+	biblatexout_initparams( &p, progname );
 	process_charsets( &argc, argv, &p );
 	process_args( &argc, argv, &p );
 	bibprog( argc, argv, &p );

@@ -1,6 +1,15 @@
 
 BIBUTILS
 
+6.9
+3/17/20
++ Add xml2biblatex converter
++ Fix bug where --no-latex/-nl isn't respected when outputting names
++ Replace latex parser
++ xml2isi - add publisher address to output
++ Cleanups to converter core
++ Fixes to some fuzzer-identified bugs
+
 6.8
 8/27/19
 + Improve ISI output
