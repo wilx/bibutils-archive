@@ -1,6 +1,10 @@
 
 BIBUTILS
 
+6.10
+3/23/20
++ Fix build errors in version 6.9
+
 6.9
 3/17/20
 + Add xml2biblatex converter

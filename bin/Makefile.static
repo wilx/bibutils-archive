@@ -81,6 +81,9 @@ xml2ads : $(FROMMODS) $(ADSOUT) ../lib/libbibcore.a
 xml2bib : $(FROMMODS) $(BIBTEXOUT) ../lib/libbibcore.a
 	$(CC) $(LDFLAGS) $^ $(LOADLIBES) $(LDLIBS) -o $@
 
+xml2biblatex : $(FROMMODS) $(BIBLATEXOUT) ../lib/libbibcore.a
+	$(CC) $(LDFLAGS) $^ $(LOADLIBES) $(LDLIBS) -o $@
+
 xml2end : $(FROMMODS) $(ENDOUT) ../lib/libbibcore.a
 	$(CC) $(LDFLAGS) $^ $(LOADLIBES) $(LDLIBS) -o $@
 

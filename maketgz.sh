@@ -5,7 +5,7 @@
 # $3 = library target
 # $4 = executable extension (.exe for Windows)
 #
-programs="biblatex2xml bib2xml copac2xml ebi2xml end2xml endx2xml ebi2xml isi2xml med2xml nbib2xml wordbib2xml modsclean ris2xml xml2ads xml2bib xml2end xml2isi xml2ris xml2wordbib"
+programs="biblatex2xml bib2xml copac2xml ebi2xml end2xml endx2xml ebi2xml isi2xml med2xml nbib2xml wordbib2xml modsclean ris2xml xml2ads xml2bib xml2biblatex xml2end xml2isi xml2nbib xml2ris xml2wordbib"
 VERSION=$1
 POSTFIX=$2
 LIBTARGET=$3
